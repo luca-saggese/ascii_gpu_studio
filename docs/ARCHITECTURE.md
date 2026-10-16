@@ -6,6 +6,8 @@ The current renderer uses one fragment pass: per output fragment, it samples a s
 
 Cell count is capped at 40,000. Glyph density, advance width, ascent, and descent are measured using Canvas 2D; the atlas tiles and output grid use those font metrics rather than a fixed oversized cell. The shader rounds density to one atlas glyph index and samples both local X and Y coordinates, so it draws the complete glyph instead of interpolating between adjacent glyphs or showing a single vertical slice. Atlas is rebuilt when typography changes and GL objects are disposed with the Studio. Media is held in memory through object URLs and revoked on source replacement/unmount.
 
+The glyph atlas is rasterized at up to 2× device-pixel ratio while preserving logical font metrics. The framebuffer uses one uniform scale based on the grid's measured aspect ratio and available preview space; it never independently stretches width and height. Atlas samples are inset by half a texel to avoid adjacent-glyph bleeding under linear filtering. The status bar reports actual framebuffer pixels separately from source dimensions and cell count. An alternate plain-text preview builds a normal monospace text grid on demand; video updates in this mode use CPU canvas sampling at up to 8 fps and can be slower than GPU preview.
+
 ## Decisions
 
 - No remote font/CDN dependency: privacy and offline operation outweigh decorative font matching; the interface uses system fonts.

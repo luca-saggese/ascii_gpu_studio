@@ -44,6 +44,11 @@ test('imports an image, renders through WebGL2, and exports the source project',
   await expect(canvas).toHaveAttribute('data-columns', '96');
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
   await expect(page.getByText('LIVE PREVIEW')).toBeVisible();
+  const cellAspect = await canvas.evaluate((element) => element.width / element.height);
+  const contentAspect = await canvas.evaluate(
+    (element) => Number(element.dataset.outputWidth) / Number(element.dataset.outputHeight),
+  );
+  expect(Math.abs(cellAspect - contentAspect)).toBeLessThan(0.01);
   const glyphShapeStats = await canvas.evaluate((element) => {
     const gl = element.getContext('webgl2');
     const pixels = new Uint8Array(element.width * element.height * 4);
@@ -94,7 +99,18 @@ test('imports an image, renders through WebGL2, and exports the source project',
   });
   expect(glyphShapeStats.variedCells).toBeGreaterThan(0);
   expect(glyphShapeStats.uniqueGlyphs).toBeGreaterThan(4);
+  await expect(page.locator('.stage-status')).toContainText('px');
   await page.screenshot({ path: 'docs/screenshots/image-preview.png' });
+  await page.getByRole('button', { name: 'ASCII text' }).click();
+  const textPreview = page.getByLabel('Plain text ASCII preview');
+  await expect(textPreview).toBeVisible();
+  await expect(page.locator('.stage-status')).toContainText('text chars');
+  const textRows = await textPreview.textContent();
+  expect(textRows.split('\n')).toHaveLength(Number(await canvas.getAttribute('data-rows')));
+  expect(textRows).toMatch(/[@#XMAHGS]/);
+  await page.screenshot({ path: 'docs/screenshots/plain-text-ascii.png' });
+  await page.getByRole('button', { name: 'GPU', exact: true }).click();
+  await expect(canvas).toBeVisible();
   const before = await canvas.evaluate((element) => element.toDataURL());
   await page.getByLabel('Columns').fill('120');
   await expect(canvas).toHaveAttribute('data-columns', '120');
@@ -112,6 +128,54 @@ test('imports an image, renders through WebGL2, and exports the source project',
   const pngBytes = await readFile(pngPath);
   expect(pngBytes.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   expect(pngBytes.readUInt32BE(16)).toBeGreaterThan(0);
+});
+
+test('maps dark image cells to denser glyphs than bright image cells', async ({ page }) => {
+  await page.goto('/');
+  const png = await page.evaluate(() => {
+    const source = document.createElement('canvas');
+    source.width = 320;
+    source.height = 160;
+    const context = source.getContext('2d');
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, 160, 160);
+    context.fillStyle = '#fff';
+    context.fillRect(160, 0, 160, 160);
+    return source.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'black-white.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  await expect(canvas).toHaveAttribute('data-columns', '96');
+  const coverage = await canvas.evaluate((element) => {
+    const gl = element.getContext('webgl2');
+    const pixels = new Uint8Array(element.width * element.height * 4);
+    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const columns = Number(element.dataset.columns);
+    const middle = Math.floor(columns / 2);
+    const halves = [0, 1].map((side) => {
+      let foreground = 0;
+      let count = 0;
+      for (let y = Math.floor(element.height * 0.2); y < Math.floor(element.height * 0.8); y += 1) {
+        for (
+          let x = Math.floor(((side ? middle : 0) * element.width) / columns);
+          x < Math.floor(((side ? columns : middle) * element.width) / columns);
+          x += 1
+        ) {
+          const offset = ((element.height - 1 - y) * element.width + x) * 4;
+          if (pixels[offset] > 140 && pixels[offset + 1] > 180 && pixels[offset + 2] > 150)
+            foreground += 1;
+          count += 1;
+        }
+      }
+      return foreground / count;
+    });
+    return halves;
+  });
+  expect(coverage[0]).toBeGreaterThan(coverage[1] + 0.25);
 });
 
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {

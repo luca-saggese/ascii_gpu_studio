@@ -13,6 +13,8 @@ pnpm dev
 
 Importa un'immagine o un video dal pulsante **Apri** o trascinandolo nell'area di anteprima. Scegli charset, griglia, colore e regolazioni; esporta un progetto `.ascii` o un PNG.
 
+Nella toolbar dell'anteprima puoi passare da **GPU** a **ASCII text** per confrontare la resa WebGL con una griglia di testo monospace normale. La modalità WebGL usa l'atlante del font rasterizzato fino a 2× la densità pixel del display; la barra di stato distingue celle ASCII e pixel effettivi del framebuffer.
+
 ## Stato
 
 Le funzionalità attive e le limitazioni verificate sono descritte in [docs/STATUS.md](docs/STATUS.md). Le immagini sono convertite direttamente in WebGL2; il video usa l'elemento media del browser, mantenendo il suo audio nativo durante la riproduzione. Supporto codec e autoplay dipendono dal browser.

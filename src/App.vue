@@ -13,7 +13,7 @@ const mediaName = ref('');
 const mediaKind = ref('');
 const mediaUrl = ref('');
 const mediaSize = ref({ width: 0, height: 0 });
-const statsLabel = ref({ columns: 0, rows: 0, backend: 'WebGL2' });
+const statsLabel = ref({ columns: 0, rows: 0, outputWidth: 0, outputHeight: 0, backend: 'WebGL2' });
 const playing = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -22,8 +22,11 @@ const message = ref('');
 const busy = ref(false);
 const renderer = ref(null);
 const activeTab = ref('controls');
+const asciiMode = ref(false);
+const asciiText = ref('');
 let videoFrame = null;
 let observer = null;
+let lastTextFrameTime = 0;
 let lastScene = JSON.stringify(scene.value);
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
@@ -106,6 +109,7 @@ async function loadMedia(file) {
     image.onload = () => {
       mediaSize.value = { width: image.naturalWidth, height: image.naturalHeight };
       renderer.value?.setSource(image);
+      if (asciiMode.value) updateAsciiText();
     };
     image.onerror = () => {
       error.value = 'Impossibile decodificare questa immagine.';
@@ -123,11 +127,34 @@ function onVideoReady() {
   video.value.volume = scene.value.playback.volume;
   renderer.value?.setSource(video.value);
   renderer.value?.renderFrame();
+  if (asciiMode.value) updateAsciiText();
+}
+
+function updateAsciiText(isVideoFrame = false) {
+  const now = performance.now();
+  if (isVideoFrame && now - lastTextFrameTime < 125) return;
+  try {
+    const result = renderer.value?.captureText();
+    if (result) {
+      lastTextFrameTime = now;
+      asciiText.value = result.text;
+      statsLabel.value = {
+        ...statsLabel.value,
+        columns: result.columns,
+        rows: result.rows,
+        outputWidth: result.columns * result.cellWidth,
+        outputHeight: result.rows * result.cellHeight,
+      };
+    }
+  } catch (err) {
+    error.value = err.message;
+  }
 }
 
 function renderVideoFrame() {
   if (!video.value || video.value.paused || video.value.ended) return;
-  renderer.value?.renderFrame();
+  if (asciiMode.value) updateAsciiText(true);
+  else renderer.value?.renderFrame();
   currentTime.value = video.value.currentTime;
   if ('requestVideoFrameCallback' in video.value)
     videoFrame = video.value.requestVideoFrameCallback(renderVideoFrame);
@@ -162,12 +189,14 @@ function seekVideo(event) {
   if (!video.value) return;
   video.value.currentTime = Number(event.target.value);
   currentTime.value = video.value.currentTime;
-  renderer.value?.renderFrame();
+  if (asciiMode.value) updateAsciiText();
+  else renderer.value?.renderFrame();
 }
 
 function onVideoEnded() {
   playing.value = false;
-  renderer.value?.renderFrame();
+  if (asciiMode.value) updateAsciiText();
+  else renderer.value?.renderFrame();
 }
 
 function dropFile(event) {
@@ -177,7 +206,13 @@ function dropFile(event) {
 
 function updateScene() {
   renderer.value?.setScene(scene.value);
+  if (asciiMode.value) updateAsciiText();
 }
+
+watch(asciiMode, (enabled) => {
+  if (enabled) updateAsciiText();
+  else renderer.value?.renderFrame();
+});
 
 watch(
   scene,
@@ -456,7 +491,11 @@ onBeforeUnmount(() => {
             ><strong>{{ mediaName || 'Untitled study' }}</strong>
           </div>
           <div class="stage-actions">
-            <span class="render-badge"><i /> WebGL2</span
+            <div class="view-switch" role="group" aria-label="Preview mode">
+              <button :class="{ selected: !asciiMode }" @click="asciiMode = false">GPU</button>
+              <button :class="{ selected: asciiMode }" @click="asciiMode = true">ASCII text</button>
+            </div>
+            <span class="render-badge"><i /> {{ asciiMode ? 'TEXT' : 'WebGL2' }}</span
             ><button class="button subtle" :disabled="!mediaFile" @click="savePng">
               Export PNG <span class="download-icon">↓</span>
             </button>
@@ -478,9 +517,21 @@ onBeforeUnmount(() => {
               <span>PNG</span><span>JPG</span><span>WEBP</span><span>MP4</span><span>WEBM</span>
             </div>
           </div>
-          <div v-else class="canvas-frame">
+          <div v-else v-show="!asciiMode" class="canvas-frame">
             <canvas ref="canvas" aria-label="ASCII rendering preview" />
             <div class="canvas-label"><i /> LIVE PREVIEW</div>
+          </div>
+          <div
+            v-if="mediaFile && asciiMode"
+            class="ascii-preview"
+            :style="{
+              '--columns': statsLabel.columns,
+              '--rows': statsLabel.rows,
+              '--requested-font': `${scene.typography.fontSize}px`,
+            }"
+          >
+            <pre aria-label="Plain text ASCII preview">{{ asciiText }}</pre>
+            <div class="canvas-label"><i /> PLAIN TEXT · {{ statsLabel.columns }} COLUMNS</div>
           </div>
           <div class="stage-corner top-left" />
           <div class="stage-corner top-right" />
@@ -498,7 +549,15 @@ onBeforeUnmount(() => {
             ><i class="status-dot" />
             {{ mediaFile ? `${mediaSize.width} × ${mediaSize.height}` : 'Ready to create' }}</span
           ><span v-if="mediaFile"
-            >{{ statsLabel.columns }} × {{ statsLabel.rows }} <span class="muted">cells</span></span
+            >{{ statsLabel.columns }} × {{ statsLabel.rows }} <span class="muted">cells</span>
+            <span v-if="statsLabel.outputWidth" class="muted"
+              >·
+              {{
+                asciiMode
+                  ? `${statsLabel.columns} × ${statsLabel.rows} text chars`
+                  : `${statsLabel.renderWidth} × ${statsLabel.renderHeight} GPU px`
+              }}</span
+            ></span
           ><span class="status-right">100% <span class="muted">·</span> GPU accelerated</span>
         </div>
         <div v-if="mediaKind === 'video'" class="video-controls">

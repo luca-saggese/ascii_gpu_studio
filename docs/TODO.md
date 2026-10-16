@@ -7,6 +7,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-001 [P0] Bootstrap Vue/Vite JavaScript project — M0; `9c9633c`.
 - [x] AGPU-010 [P0] Import local images and render glyph atlas with WebGL2 — M1; E2E verifies complete, distinct glyph masks; `9c9633c`, `e835d84`.
 - [x] AGPU-011 [P0] Wire charset, font family/size, columns, fit, color, contrast, brightness, invert — M2 baseline; E2E changes columns; `9c9633c`, `e835d84`.
+- [x] AGPU-013 [P0] Add plain-text ASCII preview beside WebGL view and report actual framebuffer resolution — E2E compares text rows, distinct GPU glyph masks and aspect ratio; text-mode video refresh capped at 8 fps.
 - [x] AGPU-020 [P0] Play, pause, seek, loop, mute, and volume native video with source audio — M3 baseline; synthetic VP8/Opus decode and controls verified in Chromium; `9c9633c`, `c229bda`.
 - [x] AGPU-030 [P0] Write/import bounded versioned `.ascii`, preserve source, scene, preview thumbnail, and render — M5; unit and browser round-trip tests; `9c9633c`.
 - [x] AGPU-031 [P0] Export PNG from WebGL canvas — M5; browser validates PNG signature and nonzero dimensions; `9c9633c`.

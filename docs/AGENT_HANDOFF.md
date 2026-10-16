@@ -4,7 +4,7 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
-Latest verified implementation commit: `e835d84`; preceding Studio, video-test, and archive-hardening checkpoints: `9c9633c`, `c229bda`, `06410a5`. Checks: lint, 5 unit tests, production build, format check, and all 5 Chromium E2E scenarios pass. The renderer now uses measured font cells, rounds to one glyph, and samples the full atlas tile.
+Latest verified implementation commit: `e835d84`; the current uncommitted renderer fix adds a plain-text ASCII preview, higher-resolution glyph atlas sampling, aspect-correct framebuffer sizing, and correct dark-to-dense glyph mapping. Checks on the working tree: lint, 5 unit tests, production build, format check, and all 6 Chromium E2E scenarios pass. The new half-black/half-white regression confirms darker cells render with denser glyphs.
 
 ## First files to read
 
@@ -38,4 +38,4 @@ No WebGL context restoration/fallback, audio acoustic assertion, other-browser E
 
 ## Resume
 
-Run `pnpm test:e2e` to validate recent UI behavior. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.
+The latest renderer and text-preview changes have passed the full local check set. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.

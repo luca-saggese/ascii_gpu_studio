@@ -15,6 +15,7 @@ uniform vec2 sourceSize;
 uniform vec2 outputSize;
 uniform vec2 gridSize;
 uniform vec2 tileSize;
+uniform float atlasScale;
 uniform float glyphCount;
 uniform float brightness;
 uniform float contrast;
@@ -41,8 +42,12 @@ void main(){
   float value=clamp((lum(avg)-.5)*contrast+.5+brightness,0.,1.);
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
-  float glyphIndex=floor(value*(glyphCount-1.)+.5);
-  vec2 atlasUv=vec2((glyphIndex+inCell.x)/glyphCount, 1.-inCell.y);
+  float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
+  vec2 tilePixels=tileSize*atlasScale;
+  vec2 atlasUv=vec2(
+    (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
+    1.-(.5+inCell.y*(tilePixels.y-1.))/tilePixels.y
+  );
   float mask=texture(atlasTex,atlasUv).r;
   vec3 ink=rgbMode>.5 ? avg : foreground;
   color=vec4(mix(background,ink,mask),1.);
@@ -92,6 +97,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       'outputSize',
       'gridSize',
       'tileSize',
+      'atlasScale',
       'glyphCount',
       'brightness',
       'contrast',
@@ -109,7 +115,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let atlas = null;
   let disposed = false;
   let lastStats = '';
+  let textCanvas = null;
   const tile = { width: 1, height: 1 };
+  const atlasScale = Math.min(window.devicePixelRatio || 1, 2);
   const color = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const setUniforms = (name, ...values) =>
     gl[values.length === 1 ? 'uniform1f' : values.length === 2 ? 'uniform2f' : 'uniform3f'](
@@ -143,10 +151,11 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
     const image = document.createElement('canvas');
-    image.width = tile.width * chars.length;
-    image.height = tile.height;
+    image.width = tile.width * chars.length * atlasScale;
+    image.height = tile.height * atlasScale;
     const ctx = image.getContext('2d', { willReadFrequently: true });
-    ctx.clearRect(0, 0, image.width, image.height);
+    ctx.scale(atlasScale, atlasScale);
+    ctx.clearRect(0, 0, tile.width * chars.length, tile.height);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
@@ -172,12 +181,17 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const height = source.videoHeight || source.naturalHeight || source.height;
     const grid = gridForSource(width, height, currentScene.grid.columns, tile.width / tile.height);
     grid.rows = Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns));
-    const outWidth = Math.max(1, grid.columns * tile.width);
-    const outHeight = Math.max(1, grid.rows * tile.height);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const outWidth = Math.max(1, grid.columns * tile.width * atlasScale);
+    const outHeight = Math.max(1, grid.rows * tile.height * atlasScale);
     const bounds = canvas.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.min(outWidth, Math.floor(bounds.width * dpr)));
-    canvas.height = Math.max(1, Math.min(outHeight, Math.floor(bounds.height * dpr)));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const renderScale = Math.min(
+      1,
+      (Math.max(1, bounds.width) * dpr) / outWidth,
+      (Math.max(1, bounds.height) * dpr) / outHeight,
+    );
+    canvas.width = Math.max(1, Math.round(outWidth * renderScale));
+    canvas.height = Math.max(1, Math.round(outHeight * renderScale));
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.useProgram(program);
     gl.bindVertexArray(vao);
@@ -203,6 +217,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('outputSize', canvas.width, canvas.height);
     setUniforms('gridSize', grid.columns, grid.rows);
     setUniforms('tileSize', tile.width, tile.height);
+    setUniforms('atlasScale', atlasScale);
     setUniforms('glyphCount', atlas.count);
     setUniforms('brightness', currentScene.appearance.brightness);
     setUniforms('contrast', currentScene.appearance.contrast);
@@ -222,11 +237,98 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     canvas.dataset.columns = String(grid.columns);
     canvas.dataset.rows = String(grid.rows);
-    const statsKey = `${grid.columns}x${grid.rows}`;
+    canvas.dataset.outputWidth = String(outWidth);
+    canvas.dataset.outputHeight = String(outHeight);
+    canvas.dataset.renderWidth = String(canvas.width);
+    canvas.dataset.renderHeight = String(canvas.height);
+    canvas.dataset.renderScale = String(renderScale);
+    const statsKey = `${grid.columns}x${grid.rows}:${outWidth}x${outHeight}`;
     if (statsKey !== lastStats) {
       lastStats = statsKey;
-      onStats({ columns: grid.columns, rows: grid.rows, backend: 'WebGL2' });
+      onStats({
+        columns: grid.columns,
+        rows: grid.rows,
+        outputWidth: outWidth,
+        outputHeight: outHeight,
+        renderWidth: canvas.width,
+        renderHeight: canvas.height,
+        renderScale,
+        cellWidth: tile.width,
+        cellHeight: tile.height,
+        backend: 'WebGL2',
+      });
     }
+  }
+
+  function captureText() {
+    if (disposed || !source || (!source.videoWidth && !source.naturalWidth && !source.width)) {
+      throw new Error('Carica un’immagine o un video prima di generare il testo ASCII.');
+    }
+    const width = source.videoWidth || source.naturalWidth || source.width;
+    const height = source.videoHeight || source.naturalHeight || source.height;
+    const grid = gridForSource(width, height, currentScene.grid.columns, tile.width / tile.height);
+    grid.rows = Math.max(
+      1,
+      Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns)),
+    );
+    if (!textCanvas) textCanvas = document.createElement('canvas');
+    textCanvas.width = grid.columns;
+    textCanvas.height = grid.rows;
+    const context = textCanvas.getContext('2d', { willReadFrequently: true });
+    const fit = currentScene.appearance.fit;
+    if (fit === 'stretch') {
+      context.drawImage(source, 0, 0, grid.columns, grid.rows);
+    } else {
+      const scale =
+        fit === 'cover'
+          ? Math.max(grid.columns / width, grid.rows / height)
+          : Math.min(grid.columns / width, grid.rows / height);
+      const drawWidth = width * scale;
+      const drawHeight = height * scale;
+      context.drawImage(
+        source,
+        (grid.columns - drawWidth) / 2,
+        (grid.rows - drawHeight) / 2,
+        drawWidth,
+        drawHeight,
+      );
+    }
+    const pixels = context.getImageData(0, 0, grid.columns, grid.rows).data;
+    const glyphs = atlas.chars;
+    let text = '';
+    for (let y = 0; y < grid.rows; y += 1) {
+      for (let x = 0; x < grid.columns; x += 1) {
+        const offset = (y * grid.columns + x) * 4;
+        const alpha = pixels[offset + 3] / 255;
+        let luminance =
+          (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
+          255;
+        luminance = Math.max(
+          0,
+          Math.min(
+            1,
+            (luminance - 0.5) * currentScene.appearance.contrast +
+              0.5 +
+              currentScene.appearance.brightness,
+          ),
+        );
+        luminance = Math.pow(luminance, 1 / Math.max(currentScene.appearance.gamma, 0.05));
+        if (currentScene.appearance.invert) luminance = 1 - luminance;
+        const density = 1 - luminance;
+        const glyphIndex = Math.round(density * (glyphs.length - 1));
+        text += alpha < 0.05 ? ' ' : glyphs[glyphIndex];
+      }
+      if (y < grid.rows - 1) text += '\n';
+    }
+    return {
+      text,
+      columns: grid.columns,
+      rows: grid.rows,
+      cellWidth: tile.width,
+      cellHeight: tile.height,
+      atlasScale,
+      fontSize: currentScene.typography.fontSize,
+    };
   }
 
   makeAtlas();
@@ -244,6 +346,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     },
     resize: renderFrame,
     renderFrame,
+    captureText,
     getStats: () => ({
       columns: Number(canvas.dataset.columns) || 0,
       rows: Number(canvas.dataset.rows) || 0,

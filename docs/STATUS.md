@@ -2,16 +2,18 @@
 
 Current milestone: M6 — release hardening, **partial implementation; not release-ready**
 
-Latest verified implementation commit: `e835d84` (`fix(renderer): sample complete glyphs with measured cell metrics`)
+Latest verified implementation commit: `e835d84` (`fix(renderer): sample complete glyphs with measured cell metrics`); subsequent renderer/text-preview fixes are verified in the working tree and awaiting commit.
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Last checks at `e835d84`: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (112.73 kB JS, 12.39 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (5 Chromium scenarios, including distinct glyph masks and source audio decode).
+Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (116.47 kB JS, 13.19 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (6 Chromium scenarios, including dark-to-dense glyph mapping, distinct glyph masks, and source audio decode).
 
 ## Works now
 
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
 - Real WebGL2 fragment shader with measured glyph atlas, live columns/font/charset/color/fit/brightness/contrast/invert controls, and PNG capture.
+- Toggle between WebGL output and normal monospace ASCII text; framebuffer uses up to 2× device-pixel atlas resolution and preserves cell aspect ratio. Status reports actual WebGL framebuffer pixels.
+- Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - `.ascii` v1 ZIP export/import containing manifest, original source, preview PNG, and settings; streaming path/entry/expanded-size checks.
 - Vue `AsciiPlayer` example loads a real package and renders it.

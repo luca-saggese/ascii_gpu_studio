@@ -471,6 +471,26 @@ input[type='range'] {
   align-items: center;
   gap: 13px;
 }
+.view-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #29312f;
+  border-radius: 5px;
+  background: #121717;
+}
+.view-switch button {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #89948f;
+  font: 9px var(--mono);
+}
+.view-switch button.selected {
+  background: #293631;
+  color: #b9e9d0;
+}
 .render-badge {
   display: flex;
   align-items: center;
@@ -646,6 +666,32 @@ input[type='range'] {
   height: 5px;
   border-radius: 50%;
   background: #9de5c4;
+}
+.ascii-preview {
+  position: absolute;
+  inset: 30px;
+  display: grid;
+  place-items: center;
+  container-type: size;
+  overflow: auto;
+}
+.ascii-preview pre {
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  color: #d5f5e9;
+  background: #101715;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: min(
+    var(--requested-font),
+    calc(90cqw / var(--columns) / 0.62),
+    calc(90cqh / var(--rows) / 1.2)
+  );
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: pre;
+  text-rendering: geometricPrecision;
+  font-variant-ligatures: none;
 }
 .stage-status {
   height: 37px;
