@@ -41,8 +41,8 @@ void main(){
   float value=clamp((lum(avg)-.5)*contrast+.5+brightness,0.,1.);
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
-  float glyph=value*(glyphCount-1.);
-  vec2 atlasUv=vec2((glyph+.5)/glyphCount, 1.-inCell.y);
+  float glyphIndex=floor(value*(glyphCount-1.)+.5);
+  vec2 atlasUv=vec2((glyphIndex+inCell.x)/glyphCount, 1.-inCell.y);
   float mask=texture(atlasTex,atlasUv).r;
   vec3 ink=rgbMode>.5 ? avg : foreground;
   color=vec4(mix(background,ink,mask),1.);
@@ -57,7 +57,7 @@ function compile(gl, type, source) {
   return shader;
 }
 
-export function createAsciiRenderer({ canvas, scene, onError = () => {} }) {
+export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats = () => {} }) {
   const gl = canvas.getContext('webgl2', {
     alpha: false,
     antialias: false,
@@ -108,7 +108,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {} }) {
   let currentScene = cloneScene(scene);
   let atlas = null;
   let disposed = false;
-  const tile = { width: 18, height: 30 };
+  let lastStats = '';
+  const tile = { width: 1, height: 1 };
   const color = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const setUniforms = (name, ...values) =>
     gl[values.length === 1 ? 'uniform1f' : values.length === 2 ? 'uniform2f' : 'uniform3f'](
@@ -119,8 +120,28 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {} }) {
   function makeAtlas() {
     const chars = coverageOrder(
       currentScene.typography.charset,
-      `${currentScene.typography.fontWeight} ${currentScene.typography.fontSize}px ${currentScene.typography.fontFamily}`,
+      currentScene.typography.fontFamily,
+      currentScene.typography.fontSize,
+      currentScene.typography.fontWeight,
     );
+    const font = `${currentScene.typography.fontWeight} ${currentScene.typography.fontSize}px ${currentScene.typography.fontFamily}`;
+    const measurementCanvas = document.createElement('canvas');
+    const measurementContext = measurementCanvas.getContext('2d');
+    measurementContext.font = font;
+    const metrics = chars.map((char) => measurementContext.measureText(char));
+    const maxAdvance = Math.max(...metrics.map((metric) => metric.width));
+    const ascent = Math.max(
+      ...metrics.map(
+        (metric) => metric.actualBoundingBoxAscent || currentScene.typography.fontSize * 0.8,
+      ),
+    );
+    const descent = Math.max(
+      ...metrics.map(
+        (metric) => metric.actualBoundingBoxDescent || currentScene.typography.fontSize * 0.2,
+      ),
+    );
+    tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
+    tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
     const image = document.createElement('canvas');
     image.width = tile.width * chars.length;
     image.height = tile.height;
@@ -128,11 +149,10 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {} }) {
     ctx.clearRect(0, 0, image.width, image.height);
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `${currentScene.typography.fontWeight} ${currentScene.typography.fontSize}px ${currentScene.typography.fontFamily}`;
-    chars.forEach((char, i) =>
-      ctx.fillText(char, i * tile.width + tile.width / 2, tile.height / 2),
-    );
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = font;
+    const baseline = (tile.height + ascent - descent) / 2;
+    chars.forEach((char, i) => ctx.fillText(char, i * tile.width + tile.width / 2, baseline));
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -202,6 +222,11 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {} }) {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     canvas.dataset.columns = String(grid.columns);
     canvas.dataset.rows = String(grid.rows);
+    const statsKey = `${grid.columns}x${grid.rows}`;
+    if (statsKey !== lastStats) {
+      lastStats = statsKey;
+      onStats({ columns: grid.columns, rows: grid.rows, backend: 'WebGL2' });
+    }
   }
 
   makeAtlas();

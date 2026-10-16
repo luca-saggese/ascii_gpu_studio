@@ -4,7 +4,7 @@ The project is a local-first Vue 3/Vite application using JavaScript ES modules.
 
 The current renderer uses one fragment pass: per output fragment, it samples a small neighborhood of the corresponding source cell, adjusts luminance, quantizes it to a glyph-density atlas entry, and composites the result. It intentionally avoids GPU readback during playback. Shader errors are surfaced to the UI; WebGL2 absence currently reports an explicit error, with no Canvas 2D fallback yet.
 
-Cell count is capped at 40,000. Glyph density is measured using a Canvas 2D coverage pass. Atlas is rebuilt when typography changes and GL objects are disposed with the Studio. Media is held in memory through object URLs and revoked on source replacement/unmount.
+Cell count is capped at 40,000. Glyph density, advance width, ascent, and descent are measured using Canvas 2D; the atlas tiles and output grid use those font metrics rather than a fixed oversized cell. The shader rounds density to one atlas glyph index and samples both local X and Y coordinates, so it draws the complete glyph instead of interpolating between adjacent glyphs or showing a single vertical slice. Atlas is rebuilt when typography changes and GL objects are disposed with the Studio. Media is held in memory through object URLs and revoked on source replacement/unmount.
 
 ## Decisions
 

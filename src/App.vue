@@ -13,6 +13,7 @@ const mediaName = ref('');
 const mediaKind = ref('');
 const mediaUrl = ref('');
 const mediaSize = ref({ width: 0, height: 0 });
+const statsLabel = ref({ columns: 0, rows: 0, backend: 'WebGL2' });
 const playing = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -27,9 +28,6 @@ let lastScene = JSON.stringify(scene.value);
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
 const durationLabel = computed(() => formatTime(duration.value));
-const statsLabel = computed(
-  () => renderer.value?.getStats() || { columns: 0, rows: 0, backend: 'WebGL2' },
-);
 
 function formatTime(seconds) {
   const value = Number.isFinite(seconds) ? seconds : 0;
@@ -52,6 +50,9 @@ async function initializeRenderer() {
       scene: scene.value,
       onError: (err) => {
         error.value = err.message;
+      },
+      onStats: (value) => {
+        statsLabel.value = value;
       },
     });
     observer = new ResizeObserver(() => renderer.value?.resize());

@@ -67,13 +67,13 @@ export function gridForSource(width, height, columns, cellAspect = 0.58) {
   };
 }
 
-export function coverageOrder(characters, font = 'monospace', size = 32) {
+export function coverageOrder(characters, fontFamily = 'monospace', size = 32, weight = 400) {
   const canvas = document.createElement('canvas');
   canvas.width = size * 2;
   canvas.height = size * 2;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) return Array.from(characters);
-  context.font = `${size}px ${font}`;
+  context.font = `${weight} ${size}px ${fontFamily}`;
   context.textBaseline = 'top';
   return Array.from(new Set(Array.from(characters)))
     .map((glyph) => {

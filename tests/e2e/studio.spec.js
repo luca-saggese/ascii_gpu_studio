@@ -44,6 +44,56 @@ test('imports an image, renders through WebGL2, and exports the source project',
   await expect(canvas).toHaveAttribute('data-columns', '96');
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
   await expect(page.getByText('LIVE PREVIEW')).toBeVisible();
+  const glyphShapeStats = await canvas.evaluate((element) => {
+    const gl = element.getContext('webgl2');
+    const pixels = new Uint8Array(element.width * element.height * 4);
+    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const columns = Number(element.dataset.columns);
+    const rows = Number(element.dataset.rows);
+    let variedCells = 0;
+    const glyphMasks = new Set();
+    for (let cellY = 0; cellY < rows; cellY += 1) {
+      for (let cellX = 0; cellX < columns; cellX += 1) {
+        const xStart = Math.floor((cellX * element.width) / columns);
+        const xEnd = Math.floor(((cellX + 1) * element.width) / columns);
+        const yStart = Math.floor((cellY * element.height) / rows);
+        const yEnd = Math.floor(((cellY + 1) * element.height) / rows);
+        let horizontalVariation = false;
+        let signature = '';
+        for (let sampleY = 0; sampleY < 8; sampleY += 1) {
+          for (let sampleX = 0; sampleX < 5; sampleX += 1) {
+            const x = Math.min(
+              xEnd - 1,
+              xStart + Math.floor(((sampleX + 0.5) * (xEnd - xStart)) / 5),
+            );
+            const y = Math.min(
+              yEnd - 1,
+              yStart + Math.floor(((sampleY + 0.5) * (yEnd - yStart)) / 8),
+            );
+            const offset = ((element.height - 1 - y) * element.width + x) * 4;
+            signature += pixels[offset] + pixels[offset + 1] + pixels[offset + 2] > 360 ? '1' : '0';
+          }
+        }
+        glyphMasks.add(signature);
+        for (let y = yStart; y < yEnd && !horizontalVariation; y += 1) {
+          let firstPixel = -1;
+          for (let x = xStart; x < xEnd; x += 1) {
+            const offset = ((element.height - 1 - y) * element.width + x) * 4;
+            const luminance = pixels[offset] + pixels[offset + 1] + pixels[offset + 2];
+            if (firstPixel !== -1 && Math.abs(luminance - firstPixel) > 90) {
+              horizontalVariation = true;
+              break;
+            }
+            firstPixel = luminance;
+          }
+        }
+        if (horizontalVariation) variedCells += 1;
+      }
+    }
+    return { variedCells, uniqueGlyphs: glyphMasks.size };
+  });
+  expect(glyphShapeStats.variedCells).toBeGreaterThan(0);
+  expect(glyphShapeStats.uniqueGlyphs).toBeGreaterThan(4);
   await page.screenshot({ path: 'docs/screenshots/image-preview.png' });
   const before = await canvas.evaluate((element) => element.toDataURL());
   await page.getByLabel('Columns').fill('120');
@@ -98,6 +148,9 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/motion-with-audio.webm');
   const video = page.locator('video.media-source');
   await expect(video).toHaveJSProperty('videoWidth', 320);
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  await expect(canvas).toHaveAttribute('data-columns', '96');
+  await expect(page.locator('.stage-status')).toContainText('96 ×');
   await expect(page.getByLabel('Toggle loop')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Play video' }).click();
   await expect.poll(() => video.evaluate((element) => element.currentTime)).toBeGreaterThan(0.2);
