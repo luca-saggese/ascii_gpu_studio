@@ -1,25 +1,42 @@
+<div align="center">
+
 # ASCII GPU Studio
 
-Studio locale-first per trasformare immagini e video in arte ASCII. Elaborazione media nel browser, anteprima accelerata da WebGL2.
+**Trasforma immagini e video in arte ASCII, direttamente nel browser.**
 
-## Avvio
+Uno studio locale-first con rendering WebGL2, anteprima testuale e audio video originale.
 
-Richiede Node.js 22–24 e pnpm 11.24.0.
+[Avvio rapido](#avvio-rapido) · [Funzionalità](#funzionalità) · [Verifiche](#verifiche) · [Stato del progetto](#stato-del-progetto)
+
+</div>
+
+<p align="center">
+  <img src="docs/screenshots/studio-showcase.png" alt="ASCII GPU Studio con un'immagine convertita in arte ASCII e i controlli di tipografia e resa" width="100%">
+</p>
+
+## In breve
+
+ASCII GPU Studio è un'applicazione web per esplorare e rifinire conversioni ASCII di immagini e video. I media vengono elaborati localmente: non sono caricati su un server. La preview GPU disegna glifi reali tramite WebGL2; in alternativa, una modalità testuale produce una griglia monospace che puoi selezionare e copiare.
+
+## Funzionalità
+
+- **Immagini e video locali** — apri un file o trascinalo nello Studio. I video vengono riprodotti con l'audio originale del browser, sincronizzato con i fotogrammi.
+- **Rendering WebGL2** — atlante dei glifi rasterizzato ad alta risoluzione (fino a 4×, nei limiti della GPU), selezione della densità e proporzioni delle celle basate sulle metriche del font.
+- **Controlli di resa** — regola charset, colonne, dimensione e famiglia del font, modalità colore, contrasto, luminosità, inversione e adattamento dell'immagine.
+- **Anteprima ASCII testuale** — passa dalla preview GPU al testo monospace normale, pronto da selezionare e copiare.
+- **Esportazione** — salva un progetto `.ascii` con sorgente, impostazioni e miniatura oppure esporta la preview in PNG.
+- **Player Vue riutilizzabile** — nel repository trovi il componente e un esempio funzionante.
+
+## Avvio rapido
+
+Requisiti: **Node.js 22–24** e **pnpm 11.24.0**.
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-Importa un'immagine o un video dal pulsante **Apri** o trascinandolo nell'area di anteprima. Scegli charset, griglia, colore e regolazioni; esporta un progetto `.ascii` o un PNG.
-
-Nella toolbar dell'anteprima puoi passare da **GPU** a **ASCII text** per confrontare la resa WebGL con una griglia di testo monospace normale. La modalità WebGL usa l'atlante del font rasterizzato fino a 2× la densità pixel del display; la barra di stato distingue celle ASCII e pixel effettivi del framebuffer.
-
-## Stato
-
-Le funzionalità attive e le limitazioni verificate sono descritte in [docs/STATUS.md](docs/STATUS.md). Le immagini sono convertite direttamente in WebGL2; il video usa l'elemento media del browser, mantenendo il suo audio nativo durante la riproduzione. Supporto codec e autoplay dipendono dal browser.
-
-Consulta il [Delivery Report](docs/DELIVERY_REPORT.md) per funzionalità verificate e limiti noti.
+Apri l'indirizzo locale mostrato da Vite, quindi importa un'immagine o un video. Regola la resa dal pannello laterale e usa **Export** per salvare il progetto modificabile o **Export PNG** per l'immagine renderizzata.
 
 ## Verifiche
 
@@ -27,10 +44,36 @@ Consulta il [Delivery Report](docs/DELIVERY_REPORT.md) per funzionalità verific
 pnpm lint
 pnpm test
 pnpm build
+pnpm format:check
 ```
 
-`pnpm test:e2e` usa Playwright; installa Chromium una volta con `pnpm exec playwright install chromium`. I file locali non vengono caricati su un server. Il formato `.ascii` è un archivio ZIP con manifest versionato, media originale e miniatura.
+I test end-to-end usano Playwright e Chromium:
+
+```sh
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+La suite copre rendering WebGL2, densità dei glifi, anteprima testuale, esportazione/importazione `.ascii`, PNG, player Vue e controlli video. L'audio viene riprodotto dal media element nativo: l'uscita udibile dipende dalle policy del browser e del dispositivo.
+
+## Formato `.ascii`
+
+Il progetto `.ascii` è un archivio ZIP versionato che contiene il manifest, il media originale, le impostazioni della scena e una miniatura PNG. L'importazione applica limiti a dimensione, numero di elementi e percorsi estratti. I file restano sul dispositivo.
+
+## Stack
+
+JavaScript ES Modules · Vue 3 · Vite · WebGL2 · Canvas 2D · Playwright
+
+## Stato del progetto
+
+Lo Studio è funzionante, ma non tutte le funzionalità previste sono state implementate. In particolare, non sono ancora disponibili esportazione WebM/TXT/SVG, cronologia undo/redo, selezione edge-aware, ripristino del contesto WebGL e una matrice E2E Firefox/WebKit. Il componente Vue è un esempio interno al repository, non ancora un pacchetto pronto per la pubblicazione indipendente.
+
+- [Stato e prossimi interventi](docs/STATUS.md)
+- [Backlog](docs/TODO.md)
+- [Delivery report: funzionalità verificate e limiti](docs/DELIVERY_REPORT.md)
+- [Architettura](docs/ARCHITECTURE.md)
+- [API del componente Vue](docs/API.md)
 
 ## Licenza
 
-MIT, vedere [LICENSE](LICENSE). Nessun codice o asset di terze parti è incorporato nel rendering.
+Distribuito con licenza [MIT](LICENSE).
