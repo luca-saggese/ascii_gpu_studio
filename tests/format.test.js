@@ -32,4 +32,12 @@ describe('.ascii project format', () => {
     const invalid = zipSync({ 'manifest.json': strToU8('{}') });
     await expect(readAscii(invalid)).rejects.toThrow(/versione/i);
   });
+
+  it('rejects drive-absolute archive entries', async () => {
+    const archive = zipSync({
+      'manifest.json': strToU8('{}'),
+      'C:/outside.png': new Uint8Array([1]),
+    });
+    await expect(readAscii(archive)).rejects.toThrow(/Percorso non sicuro/);
+  });
 });

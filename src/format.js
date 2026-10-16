@@ -5,6 +5,16 @@ const MAX_ARCHIVE_BYTES = 110 * 1024 * 1024;
 const MAX_EXPANDED_BYTES = 200 * 1024 * 1024;
 const MAX_ENTRIES = 32;
 
+function isUnsafePath(path) {
+  return (
+    path.startsWith('/') ||
+    /^[a-z]:/i.test(path) ||
+    path.includes('\\') ||
+    path.includes('\0') ||
+    path.split('/').includes('..')
+  );
+}
+
 function safeExtension(name) {
   const match = String(name)
     .toLowerCase()
@@ -50,7 +60,7 @@ export async function readAscii(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   if (bytes.byteLength > MAX_ARCHIVE_BYTES)
     throw new Error('Archivio .ascii superiore al limite compresso di 110 MB.');
-  const entries = {};
+  const entries = Object.create(null);
   let count = 0;
   let expandedBytes = 0;
   let failure = '';
@@ -61,11 +71,7 @@ export async function readAscii(input) {
       entry.terminate();
       return;
     }
-    if (
-      entry.name.startsWith('/') ||
-      entry.name.includes('\\') ||
-      entry.name.split('/').includes('..')
-    ) {
+    if (isUnsafePath(entry.name)) {
       failure = 'Percorso non sicuro nell’archivio .ascii.';
       entry.terminate();
       return;
@@ -128,7 +134,7 @@ export async function readAscii(input) {
     throw new Error('Versione del progetto .ascii non supportata.');
   if (typeof manifest.media?.path !== 'string' || !entries[manifest.media.path])
     throw new Error('File media indicato dal manifest non presente.');
-  if (manifest.media.path.startsWith('/') || manifest.media.path.split('/').includes('..'))
+  if (!manifest.media.path.startsWith('media/') || isUnsafePath(manifest.media.path))
     throw new Error('Percorso media non sicuro.');
   const saved = manifest.scene || {};
   const scene = {
