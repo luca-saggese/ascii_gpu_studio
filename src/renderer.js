@@ -117,7 +117,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let lastStats = '';
   let textCanvas = null;
   const tile = { width: 1, height: 1 };
-  const atlasScale = Math.min(window.devicePixelRatio || 1, 2);
+  let atlasScale = 1;
+  const targetAtlasScale = Math.min((window.devicePixelRatio || 1) * 2, 4);
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const color = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const setUniforms = (name, ...values) =>
     gl[values.length === 1 ? 'uniform1f' : values.length === 2 ? 'uniform2f' : 'uniform3f'](
@@ -150,6 +152,16 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     );
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
+    atlasScale = Math.max(
+      1,
+      Math.floor(
+        Math.min(
+          targetAtlasScale,
+          maxTextureSize / (tile.width * chars.length),
+          maxTextureSize / tile.height,
+        ),
+      ),
+    );
     const image = document.createElement('canvas');
     image.width = tile.width * chars.length * atlasScale;
     image.height = tile.height * atlasScale;
@@ -242,6 +254,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     canvas.dataset.renderWidth = String(canvas.width);
     canvas.dataset.renderHeight = String(canvas.height);
     canvas.dataset.renderScale = String(renderScale);
+    canvas.dataset.atlasScale = String(atlasScale);
     const statsKey = `${grid.columns}x${grid.rows}:${outWidth}x${outHeight}`;
     if (statsKey !== lastStats) {
       lastStats = statsKey;

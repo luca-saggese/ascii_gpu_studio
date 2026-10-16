@@ -12,7 +12,7 @@ Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm 
 
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
 - Real WebGL2 fragment shader with measured glyph atlas, live columns/font/charset/color/fit/brightness/contrast/invert controls, and PNG capture.
-- Toggle between WebGL output and normal monospace ASCII text; framebuffer uses up to 2× device-pixel atlas resolution and preserves cell aspect ratio. Status reports actual WebGL framebuffer pixels.
+- Toggle between WebGL output and normal monospace ASCII text; glyph atlas rasterization uses 2× device-pixel ratio up to 4×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - `.ascii` v1 ZIP export/import containing manifest, original source, preview PNG, and settings; streaming path/entry/expanded-size checks.

@@ -43,6 +43,9 @@ test('imports an image, renders through WebGL2, and exports the source project',
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
   await expect(canvas).toHaveAttribute('data-columns', '96');
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
+  await expect
+    .poll(() => canvas.getAttribute('data-atlas-scale').then(Number))
+    .toBeGreaterThanOrEqual(2);
   await expect(page.getByText('LIVE PREVIEW')).toBeVisible();
   const cellAspect = await canvas.evaluate((element) => element.width / element.height);
   const contentAspect = await canvas.evaluate(
