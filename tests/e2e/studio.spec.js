@@ -101,6 +101,9 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   await expect(page.getByLabel('Toggle loop')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Play video' }).click();
   await expect.poll(() => video.evaluate((element) => element.currentTime)).toBeGreaterThan(0.2);
+  await expect
+    .poll(() => video.evaluate((element) => element.webkitAudioDecodedByteCount || 0))
+    .toBeGreaterThan(0);
   await page.getByLabel('Video position').fill('1.7');
   await expect.poll(() => video.evaluate((element) => element.currentTime)).toBeGreaterThan(1.6);
   await page.getByRole('button', { name: 'Pause video' }).click();
