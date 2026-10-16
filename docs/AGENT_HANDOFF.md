@@ -4,6 +4,8 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
+Latest verified implementation commit: `06410a5`; preceding Studio and video-test checkpoints: `9c9633c`, `c229bda`. Checks: lint, 5 unit tests, production build, format check, and all 5 Chromium E2E scenarios pass.
+
 ## First files to read
 
 1. `docs/STATUS.md`, `docs/TODO.md`, `docs/ARCHITECTURE.md`, `docs/FILE_FORMAT.md`
@@ -36,4 +38,4 @@ No WebGL context restoration/fallback, audio acoustic assertion, other-browser E
 
 ## Resume
 
-Run `pnpm test:e2e` to validate recent UI behavior, then complete final checks and update status with actual commit SHAs. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.
+Run `pnpm test:e2e` to validate recent UI behavior. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.

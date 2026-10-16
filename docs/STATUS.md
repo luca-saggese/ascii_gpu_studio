@@ -1,8 +1,12 @@
 # Execution status
 
-Current milestone: M6 — release hardening, **partial implementation; not release-ready**  
-Latest verified commit: pending milestone commits  
-Last checks: lint pending final run; unit pending final run; build pending final run; E2E Chromium 5/5 PASS (latest full run before final validation)
+Current milestone: M6 — release hardening, **partial implementation; not release-ready**
+
+Latest verified implementation commit: `06410a5` (`fix(format): reject drive-absolute asset paths`)
+
+Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E)
+
+Last checks at `06410a5`: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (112.21 kB JS, 12.39 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (5 Chromium scenarios, including source audio decode).
 
 ## Works now
 
@@ -16,10 +20,11 @@ Last checks: lint pending final run; unit pending final run; build pending final
 ## Does not work / not claimed
 
 - Edge-aware/perceptual selection, temporal hysteresis, custom charset text entry, editing/history/undo, presets, custom font uploads, TXT/SVG export.
-- WebM export and video frame-step; audio playback is the original `<video>` audio track only. The fixture confirms a source audio track exists and native video plays, but browser test does not acoustically verify audible output.
+- WebM export and video frame-step; audio playback is the original `<video>` audio track only. The synthetic Opus stream is confirmed decoded during native video playback; audible output still depends on browser/device audio policy.
 - React/Web Component packages, external Vue consumer install/publish, Canvas2D fallback, WebGL context restoration.
 - CI/browser matrix, screen-reader audit, quantitative performance/memory benchmarks, and hand-reviewed screenshots on other operating systems.
 - `.ascii` hard limits prevent oversized extraction, but the implementation still holds extracted file bytes in memory; archives are local, not streamed from remote storage.
+- Expanded-size enforcement is implemented during decompression, but there is not yet a dedicated ZIP-bomb regression fixture that drives the 200 MiB cap.
 
 ## Known limits
 
@@ -30,6 +35,6 @@ Last checks: lint pending final run; unit pending final run; build pending final
 
 ## Next three actions
 
-1. Run final lint, unit, build, format, and full Chromium E2E after final code changes.
-2. Finish docs with exact check results and tested limitations, then checkpoint commits.
-3. Continue AGPU-041 and AGPU-051 before claiming release readiness.
+1. Add a ZIP expansion-limit regression fixture and WebGL context loss/restore coverage.
+2. Make the Vue SDK package self-contained and verify an external consumer installation.
+3. Add CI and Firefox/WebKit E2E before claiming release readiness.

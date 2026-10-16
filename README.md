@@ -17,6 +17,8 @@ Importa un'immagine o un video dal pulsante **Apri** o trascinandolo nell'area d
 
 Le funzionalità attive e le limitazioni verificate sono descritte in [docs/STATUS.md](docs/STATUS.md). Le immagini sono convertite direttamente in WebGL2; il video usa l'elemento media del browser, mantenendo il suo audio nativo durante la riproduzione. Supporto codec e autoplay dipendono dal browser.
 
+Consulta il [Delivery Report](docs/DELIVERY_REPORT.md) per funzionalità verificate e limiti noti.
+
 ## Verifiche
 
 ```sh
