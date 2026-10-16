@@ -2,11 +2,11 @@
 
 Current milestone: M6 — release hardening, **partial implementation; not release-ready**
 
-Latest verified implementation commit: `06410a5` (`fix(format): reject drive-absolute asset paths`)
+Latest verified implementation commit: `e835d84` (`fix(renderer): sample complete glyphs with measured cell metrics`)
 
-Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E)
+Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Last checks at `06410a5`: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (112.21 kB JS, 12.39 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (5 Chromium scenarios, including source audio decode).
+Last checks at `e835d84`: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (112.73 kB JS, 12.39 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (5 Chromium scenarios, including distinct glyph masks and source audio decode).
 
 ## Works now
 

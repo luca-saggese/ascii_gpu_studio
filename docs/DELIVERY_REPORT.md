@@ -7,13 +7,15 @@
 - Implementation: `9c9633c` — `feat(studio): deliver WebGL ASCII workspace and Vue player`
 - Verification: `c229bda` — `test(video): verify decoded source audio during playback`
 - Hardening: `06410a5` — `fix(format): reject drive-absolute asset paths`
+- Renderer correction: `e835d84` — `fix(renderer): sample complete glyphs with measured cell metrics`
 - Working tree: implementation and verification committed; the supplied specification file remains untracked and unchanged.
 
 ## Implemented and verified
 
 - Vue 3/Vite Studio in JavaScript ESM, Node 24.20.0 / pnpm 11.24.0; no TypeScript.
 - Responsive dark Studio with local image/video selection, drag-and-drop, loading/error states, fitted canvas and mobile controls view.
-- Real WebGL2 glyph-atlas renderer; live columns, built-in charset, font family/size, monochrome/source color, fit, foreground/background, contrast, brightness and invert. Cell count capped at 40,000. The shader avoids per-frame GPU readback.
+- Real WebGL2 glyph-atlas renderer; live columns, built-in charset, font family/size, monochrome/source color, fit, foreground/background, contrast, brightness and invert. Cell advance and height use measured font metrics; the shader selects a discrete glyph and samples the full glyph tile. Cell count is capped at 40,000, with no per-frame GPU readback.
+- A browser regression check confirms glyphs have horizontal mask variation and multiple distinct cell masks; this guards against sampling a single atlas column or blending adjacent characters.
 - Local HTML video playback with original native audio, media-clock rendering, play/pause/seek/loop/mute/volume. The synthetic VP8/Opus fixture is played in Chromium and its audio decode counter is verified; acoustic output is not asserted.
 - Version 1 `.ascii` ZIP export/import containing the original source, settings, manifest and rendered PNG thumbnail. Extraction checks paths, entry count, format version and a 200 MiB expansion cap while streaming entries.
 - PNG export from the rendered WebGL canvas.
@@ -27,7 +29,7 @@
 | ------------------- | --------------------------------------------------------------- |
 | `pnpm lint`         | PASS, no warnings                                               |
 | `pnpm test`         | PASS, 5 unit tests                                              |
-| `pnpm build`        | PASS; JS 112.21 kB (43.90 kB gzip), CSS 12.39 kB (3.60 kB gzip) |
+| `pnpm build`        | PASS; JS 112.73 kB (44.13 kB gzip), CSS 12.39 kB (3.60 kB gzip) |
 | `pnpm format:check` | PASS                                                            |
 | `pnpm test:e2e`     | PASS, 5 Chromium scenarios                                      |
 

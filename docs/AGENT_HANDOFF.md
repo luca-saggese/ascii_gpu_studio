@@ -4,7 +4,7 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
-Latest verified implementation commit: `06410a5`; preceding Studio and video-test checkpoints: `9c9633c`, `c229bda`. Checks: lint, 5 unit tests, production build, format check, and all 5 Chromium E2E scenarios pass.
+Latest verified implementation commit: `e835d84`; preceding Studio, video-test, and archive-hardening checkpoints: `9c9633c`, `c229bda`, `06410a5`. Checks: lint, 5 unit tests, production build, format check, and all 5 Chromium E2E scenarios pass. The renderer now uses measured font cells, rounds to one glyph, and samples the full atlas tile.
 
 ## First files to read
 
