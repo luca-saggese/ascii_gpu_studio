@@ -1,0 +1,34 @@
+# TODO — execution backlog
+
+Each status reflects the tested user-facing path, not code presence alone. Estimates are coarse.
+
+## Completed
+
+- [x] AGPU-001 [P0] Bootstrap Vue/Vite JavaScript project — M0, tested lint/unit/build/E2E.
+- [x] AGPU-010 [P0] Import local images and render glyph atlas with WebGL2 — M1; Playwright verifies live canvas changes.
+- [x] AGPU-011 [P0] Wire charset, font family/size, columns, fit, color, contrast, brightness, invert — M2 baseline; Playwright exercises column update.
+- [x] AGPU-020 [P0] Play, pause, seek, loop, mute, and volume native video with source audio — M3 baseline; synthetic VP8/Opus fixture verified in Chromium.
+- [x] AGPU-030 [P0] Write/import bounded versioned `.ascii`, preserve source, scene, preview thumbnail, and render — M5; unit and browser round-trip tests.
+- [x] AGPU-031 [P0] Export PNG from WebGL canvas — M5; browser validates PNG signature and dimensions.
+- [x] AGPU-032 [P0] Vue `AsciiPlayer` wrapper and runnable example — M5; browser loads a genuine generated `.ascii` and renders it.
+- [x] AGPU-040 [P0] Reject ZIP traversal and constrain streaming extraction — tested in unit and E2E suites.
+
+## In progress
+
+- [ ] AGPU-050 [P0] Release hardening and delivery evidence — M6; complete the multi-browser matrix and review E2E screenshots.
+
+## Backlog
+
+- [ ] AGPU-012 [P0] Validate image magic bytes, EXIF orientation, alpha handling, and browser texture limits.
+- [ ] AGPU-021 [P0] Verify native audio output across browser policies/devices and include a manual audio check.
+- [ ] AGPU-033 [P0] Make Vue SDK self-contained/publishable and test consumer install from an external project.
+- [ ] AGPU-041 [P0] Add tested WebGL context loss/restoration and a user-visible recovery path.
+- [ ] AGPU-051 [P0] Add CI workflow, browser installation/cache, npm/license audit, and accessibility review.
+- [ ] AGPU-052 [P1] Add edge-aware selection, temporal hysteresis, golden quality comparisons, and measured FPS benchmarks.
+- [ ] AGPU-053 [P1] Add custom charset entry, preset library, undo/redo, custom font handling, TXT/SVG export.
+- [ ] AGPU-054 [P1] Add React and Web Component wrappers.
+- [ ] AGPU-055 [P2] Evaluate adaptive quality, GIF animation, webcam, and WebM recording with verified audio.
+
+## Blocked
+
+- None. P0 hardening and support breadth remain incomplete but do not prevent further local development.

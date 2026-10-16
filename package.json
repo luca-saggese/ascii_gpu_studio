@@ -1,13 +1,33 @@
 {
-  "name": "ascii_gpu_studio",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "name": "ascii-gpu-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=22 <25"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "fflate": "^0.8.2",
+    "pinia": "^3.0.3",
+    "vite": "^6.3.5",
+    "vue": "^3.5.17"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-vue": "^10.2.0",
+    "prettier": "^3.5.3",
+    "vitest": "^3.2.4"
+  }
 }
