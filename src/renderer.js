@@ -46,7 +46,7 @@ void main(){
   vec2 tilePixels=tileSize*atlasScale;
   vec2 atlasUv=vec2(
     (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
-    1.-(.5+inCell.y*(tilePixels.y-1.))/tilePixels.y
+    (.5+inCell.y*(tilePixels.y-1.))/tilePixels.y
   );
   float mask=texture(atlasTex,atlasUv).r;
   vec3 ink=rgbMode>.5 ? avg : foreground;
