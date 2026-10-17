@@ -40,7 +40,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [ ] AGPU-053 [P1] Add custom charset entry, preset library, undo/redo, custom font handling, TXT/SVG export.
 - [ ] AGPU-054 [P1] Add React and Web Component wrappers.
 - [ ] AGPU-055 [P2] Evaluate adaptive quality, GIF animation, webcam, and WebM recording with verified audio.
-- [ ] AGPU-057 [P1] Add deterministic WebCodecs video/audio encoding and a verified MP4 muxer; current Chromium has neither WebCodecs nor a bundled muxer, so MP4 export fails explicitly instead of emitting an invalid file.
+- [x] AGPU-057 [P1] Add capability-checked deterministic H.264/AAC WebCodecs encoding and verified MP4 muxing; source video audio is demuxed directly from the original file, while imported `.ascii` uses embedded audio. Chromium E2E verifies playable MP4 with audio and silent video. Safari runtime validation remains in the cross-browser backlog.
 
 ## Blocked
 

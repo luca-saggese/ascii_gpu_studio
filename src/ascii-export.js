@@ -55,9 +55,12 @@ async function captureAudio(video, signal, onProgress) {
     stream.getTracks().forEach((track) => track.stop());
     throw new Error('MediaRecorder non disponibile: non posso incorporare l’audio nel file ASCII.');
   }
-  const mimeType = ['audio/webm;codecs=opus', 'audio/webm'].find((type) =>
-    MediaRecorder.isTypeSupported(type),
-  );
+  const mimeType = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4;codecs=mp4a.40.2',
+    'audio/mp4',
+  ].find((type) => MediaRecorder.isTypeSupported(type));
   if (!mimeType) {
     stream.getTracks().forEach((track) => track.stop());
     throw new Error('Il browser non dispone di un encoder audio WebM compatibile.');
@@ -210,6 +213,7 @@ export async function captureAsciiDocument({
   signal,
   onProgress = () => {},
   onWarning = () => {},
+  includeAudio = true,
 }) {
   if (signal?.aborted) throw new DOMException('Esportazione annullata.', 'AbortError');
   if (kind === 'image') {
@@ -233,11 +237,13 @@ export async function captureAsciiDocument({
   const previousTime = video.currentTime;
   try {
     let audio = null;
-    try {
-      audio = await captureAudio(video, signal, onProgress);
-    } catch (error) {
-      if (error.name === 'AbortError') throw error;
-      onWarning(`Audio non incluso: ${error.message} L’esportazione ASCII prosegue senza audio.`);
+    if (includeAudio) {
+      try {
+        audio = await captureAudio(video, signal, onProgress);
+      } catch (error) {
+        if (error.name === 'AbortError') throw error;
+        onWarning(`Audio non incluso: ${error.message} L’esportazione ASCII prosegue senza audio.`);
+      }
     }
     await waitForSeek(video, 0, signal);
     const firstCapture = renderer.captureText();

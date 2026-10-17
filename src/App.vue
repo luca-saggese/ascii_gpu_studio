@@ -8,7 +8,7 @@ import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-docume
 import { captureAsciiDocument } from './ascii-export.js';
 import { renderAsciiPng } from './ascii-render.js';
 import { createPlayableHtml } from './templates/playable-template.js';
-import { assertDeterministicMp4Support } from './mp4-export.js';
+import { assertDeterministicMp4Support, encodeAsciiMp4 } from './mp4-export.js';
 import { renderAsciiPage } from './ascii-render.js';
 
 const DEFAULTS_STORAGE_KEY = 'ascii-gpu-studio:scene-defaults:v1';
@@ -382,30 +382,36 @@ function exportBaseName() {
   return mediaName.value.replace(/\.(ascii|[^.]+)$/i, '') || 'ascii-art';
 }
 
-async function buildExportDocument() {
+async function buildExportDocument({
+  signal,
+  progressStart = 0,
+  progressEnd = 1,
+  includeAudio = true,
+} = {}) {
   if (asciiDocument.value) return asciiDocument.value;
   if (!renderer.value || !mediaFile.value) throw new Error('Carica prima un’immagine o un video.');
   await ensureVideoPalette();
   const wasPlaying = mediaKind.value === 'video' && !video.value.paused;
   if (wasPlaying) pauseVideo();
-  const controller = new AbortController();
-  exportAbort.value = controller;
   try {
     return await captureAsciiDocument({
       renderer: renderer.value,
       scene: scene.value,
       kind: mediaKind.value,
       video: mediaKind.value === 'video' ? video.value : null,
-      signal: controller.signal,
+      signal,
+      includeAudio,
       onProgress: (progress) => {
-        exportProgress.value = Math.min(100, Math.round(progress * 100));
+        exportProgress.value = Math.min(
+          100,
+          Math.round((progressStart + progress * (progressEnd - progressStart)) * 100),
+        );
       },
       onWarning: (warning) => {
         exportWarning = warning;
       },
     });
   } finally {
-    exportAbort.value = null;
     if (wasPlaying) playVideo();
   }
 }
@@ -417,12 +423,39 @@ async function performExport(kind) {
   exportProgress.value = 0;
   exportWarning = '';
   error.value = '';
+  const controller = new AbortController();
+  exportAbort.value = controller;
   try {
     if (kind === 'mp4') {
-      assertDeterministicMp4Support();
+      const dimensions =
+        asciiDocument.value?.render ??
+        (() => {
+          const capture = renderer.value?.captureText();
+          if (!capture) throw new Error('Carica prima un video.');
+          return {
+            width: Math.ceil((capture.columns * capture.cellWidth) / 2) * 2,
+            height: Math.ceil((capture.rows * capture.cellHeight) / 2) * 2,
+          };
+        })();
+      await assertDeterministicMp4Support(dimensions.width, dimensions.height);
+      const model = await buildExportDocument({
+        signal: controller.signal,
+        progressStart: 0,
+        progressEnd: 0.45,
+        includeAudio: false,
+      });
+      const blob = await encodeAsciiMp4(model, {
+        signal: controller.signal,
+        sourceFile: mediaFile.value,
+        onProgress: (progress) => {
+          exportProgress.value = Math.round((0.45 + progress * 0.55) * 100);
+        },
+      });
+      download(blob, `${exportBaseName()}.mp4`);
+      notify(exportWarning || 'Export MP4 completato');
       return;
     }
-    const model = await buildExportDocument();
+    const model = await buildExportDocument({ signal: controller.signal });
     if (kind === 'ascii') {
       const bytes = await serializeAsciiDocument(model);
       download(new Blob([bytes], { type: 'application/gzip' }), `${exportBaseName()}.ascii`);

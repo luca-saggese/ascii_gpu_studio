@@ -540,7 +540,9 @@ test('flattens image colors to a reduced perceptual palette in preview and ASCII
 test('keeps one globally sampled palette across video frames', async ({ page }) => {
   await page.goto('/');
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/video-silent.webm');
-  await expect(page.locator('video.media-source')).toHaveJSProperty('videoWidth', 160);
+  const source = page.locator('video.media-source');
+  await expect(source).toHaveJSProperty('videoWidth', 160);
+  const sourceDuration = await source.evaluate((video) => video.duration);
   await page.getByRole('button', { name: 'Source color' }).click();
   await page.getByLabel('Enable color flattening').check();
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
@@ -586,6 +588,42 @@ test('exports video frames without audio when browser capture is unavailable', a
   expect(exported.contentType).toBe('video');
   expect(exported).not.toHaveProperty('audio');
   await expect(page.locator('.toast')).toContainText('L’esportazione ASCII prosegue senza audio');
+});
+
+test('exports a playable MP4 for video without an audio track', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/video-silent.webm');
+  const source = page.locator('video.media-source');
+  await expect(source).toHaveJSProperty('videoWidth', 160);
+  const sourceDuration = await source.evaluate((video) => video.duration);
+  await page.getByRole('button', { name: /Export/ }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'Export video (.mp4)' }).click();
+  const file = await download;
+  const bytes = await readFile(await file.path());
+  expect(bytes.subarray(4, 8).toString()).toBe('ftyp');
+  const metadata = await page.evaluate(
+    async (inputBytes) => {
+      const source = new Uint8Array(inputBytes);
+      const video = document.createElement('video');
+      const url = URL.createObjectURL(new Blob([source], { type: 'video/mp4' }));
+      video.src = url;
+      try {
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve;
+          video.onerror = () => reject(new Error('Generated silent MP4 could not be decoded.'));
+        });
+        return { duration: video.duration, atoms: new TextDecoder().decode(source) };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+    [...bytes],
+  );
+  expect(metadata.duration).toBeGreaterThan(0);
+  expect(Math.abs(metadata.duration - sourceDuration)).toBeLessThan(0.1);
+  expect(metadata.atoms).toContain('avc1');
+  expect(metadata.atoms).not.toContain('mp4a');
 });
 
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {
@@ -640,10 +678,6 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   expect(await video.evaluate((element) => element.currentTime)).toBeCloseTo(pausedAt, 1);
   await page.screenshot({ path: 'docs/screenshots/video-playback.png' });
 
-  await page.getByRole('button', { name: /Export/ }).click();
-  await page.getByRole('menuitem', { name: 'Export video (.mp4)' }).click();
-  await expect(page.getByRole('alert')).toContainText(/Export MP4 non supportato/);
-
   const asciiDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: /Export/ }).click();
   await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
@@ -660,6 +694,46 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
         sourceDurationMs,
     ),
   ).toBeLessThan(100);
+
+  await page.getByRole('button', { name: /Export/ }).click();
+  const mp4Download = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'Export video (.mp4)' }).click();
+  const mp4File = await mp4Download;
+  expect(mp4File.suggestedFilename()).toMatch(/\.mp4$/);
+  const mp4Bytes = await readFile(await mp4File.path());
+  expect(mp4Bytes.subarray(4, 8).toString()).toBe('ftyp');
+  const mp4Metadata = await page.evaluate(
+    async (inputBytes) => {
+      const bytes = new Uint8Array(inputBytes);
+      const atoms = new TextDecoder().decode(bytes);
+      const videoElement = document.createElement('video');
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'video/mp4' }));
+      videoElement.src = url;
+      try {
+        await new Promise((resolve, reject) => {
+          videoElement.onloadedmetadata = resolve;
+          videoElement.onerror = () => reject(new Error('Generated MP4 could not be decoded.'));
+        });
+        return {
+          hasH264: atoms.includes('avc1'),
+          hasAac: atoms.includes('mp4a'),
+          duration: videoElement.duration,
+          width: videoElement.videoWidth,
+          height: videoElement.videoHeight,
+        };
+      } finally {
+        URL.revokeObjectURL(url);
+        videoElement.removeAttribute('src');
+        videoElement.load();
+      }
+    },
+    [...mp4Bytes],
+  );
+  expect(mp4Metadata.hasH264).toBe(true);
+  expect(mp4Metadata.hasAac).toBe(true);
+  expect(Math.abs(mp4Metadata.duration - sourceDurationMs / 1000)).toBeLessThan(0.1);
+  expect(mp4Metadata.width).toBeGreaterThan(0);
+  expect(mp4Metadata.height).toBeGreaterThan(0);
 
   await page.locator('input[type=file]').setInputFiles({
     name: asciiFile.suggestedFilename(),

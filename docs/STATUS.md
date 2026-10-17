@@ -6,7 +6,7 @@ Latest committed implementation: `691d2b2` (`feat(renderer): add offline vector 
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification after export-performance optimization: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (15 Chromium tests) all pass. Browser regressions cover unavailable WebGL2 fallback and the optimized filter output. Video ASCII export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification after MP4 source-audio demux: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (16 Chromium tests) all pass. Browser regressions cover unavailable WebGL2 fallback, optimized filter output, MP4 with AAC demuxed from the original video, and silent MP4. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
@@ -30,14 +30,14 @@ Latest verification after export-performance optimization: `pnpm lint`, `pnpm te
 - Vector preview uses Canvas 2D path rasterization rather than WebGL; large grids and video can therefore be slower than bitmap preview.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
-- MP4 is intentionally not emitted in this environment: Chromium reports MediaRecorder MP4 support but has no WebCodecs, and a verified MP4 muxer is not bundled. The UI reports this accurately instead of making a nondeterministic real-time recording.
-- Chromium E2E covers the panel's bounded scrolling and collapsible groups, live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, MP4 capability errors, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
+- MP4 export uses Mediabunny to mux deterministic ASCII-rendered H.264 frames and, when available, AAC audio into a real MP4. For source videos it demuxes audio directly from the original local file; imported `.ascii` documents use their embedded audio. Encoder support is checked at the selected dimensions; unsupported codecs report an explicit capability error instead of producing a mislabeled file.
+- Chromium E2E covers the panel's bounded scrolling and collapsible groups, live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, playable H.264/AAC MP4 with audio and silent MP4, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
 
 ## Does not work / not claimed
 
 - Temporal hysteresis, custom charset text entry, editing/history/undo, presets, custom font uploads, TXT/SVG export.
-- Deterministic MP4 export awaits WebCodecs plus a verified muxer. HTML player fonts use the installed local monospace family rather than embedding a font file.
-- Exported video audio is captured to WebM/Opus via `captureStream` and MediaRecorder; browser support varies, and unsupported capture/codec paths return explicit errors. Native Studio playback continues using the original video audio track.
+- Safari has not yet been included in the automated browser matrix. MP4 output requires native WebCodecs H.264 encoding and, for audio, AAC encoding; unsupported device/browser configurations return a specific error.
+- `.ascii` audio capture still uses WebM/Opus via `captureStream` and MediaRecorder, so browser support varies and unsupported paths are reported while frame export continues silently. MP4 from a source video bypasses MediaRecorder and demuxes the original file; imported `.ascii` MP4 uses its embedded audio.
 - React/Web Component packages, external Vue consumer install/publish, WebGL context restoration.
 - CI/browser matrix, screen-reader audit, quantitative performance/memory benchmarks, and hand-reviewed screenshots on other operating systems.
 - `.ascii` hard limits prevent oversized extraction, but the implementation still holds extracted file bytes in memory; archives are local, not streamed from remote storage.

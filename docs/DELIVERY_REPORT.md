@@ -4,7 +4,7 @@
 
 - One **Export** dropdown, shown in the existing dark/teal UI. It offers ASCII, a source-appropriate PNG or MP4 action, and HTML playable. Outside click, Escape, arrow-key menu navigation, disabled states, video progress, and cancellation are wired.
 - Version 1 `.ascii` is gzip-compressed UTF-8 JSON. It stores only rendered text pages and render parameters, with timestamps/durations for video, and compact Base64 RGB bytes per cell where needed. Image documents contain one page and no audio. The decoder validates the schema; older ZIP-based projects remain importable.
-- Video-to-ASCII frame capture seeks through the source at a fixed 100 ms timeline, independent of preview callbacks. It yields between frames, reports progress, supports cancel, restores the source playback position, and includes captured WebM/Opus audio when the browser exposes a capturable audio track.
+- Video-to-ASCII frame capture seeks through the source at a fixed 100 ms timeline, independent of preview callbacks. It yields between frames, reports progress, supports cancel, restores the source playback position, and includes captured audio when the browser exposes a capturable audio track (WebM/Opus in Chromium, MP4/AAC where supported in Safari).
 - Audio extraction is optional: if the browser lacks capture/recording support or audio recording fails, frame export still completes without audio and reports the omission.
 - PNG uses the ASCII page model and configured cell/font/color dimensions, not the source raster or Studio UI. It renders through OffscreenCanvas in a worker where available.
 - HTML playable is a single offline `.html`: it embeds the compressed `.ascii` bytes as Base64, includes a self-contained player and the same page renderer, and has play/pause, seek, clock, volume, mute, and fullscreen controls. With audio it follows the audio clock; without audio it uses a monotonic clock. ASCII data is passed to `fillText`, never `innerHTML`.
@@ -19,25 +19,25 @@
 | Check               | Result                     |
 | ------------------- | -------------------------- |
 | `pnpm lint`         | Passed                     |
-| `pnpm test`         | Passed — 14 tests          |
+| `pnpm test`         | Passed — 15 tests          |
 | `pnpm build`        | Passed                     |
 | `pnpm format:check` | Passed                     |
-| `pnpm test:e2e`     | Passed — 14 Chromium tests |
+| `pnpm test:e2e`     | Passed — 16 Chromium tests |
 
-E2E additionally verifies vector preview and export, accented characters/punctuation, and that the `O` counter remains empty under even-odd path filling. It covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, video frame export when audio capture is unavailable, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
+E2E additionally verifies vector preview and export, accented characters/punctuation, and that the `O` counter remains empty under even-odd path filling. It covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, video frame export when audio capture is unavailable, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, MP4 playback with H.264/AAC tracks and MP4 playback without audio.
 
-## MP4 limitation — explicit
+## MP4 export
 
-The MP4 menu action is implemented as a capability-checked operation but does not generate an MP4 in the verified environment. Playwright Chromium reports `MediaRecorder` MP4 support, but `VideoEncoder` and `AudioEncoder` (WebCodecs) are absent. Real-time `MediaRecorder` output cannot guarantee deterministic frame timestamps or no dropped frames, so the app stops with an actionable error rather than returning a misleading or incorrect `.mp4`. A deterministic WebCodecs pipeline and a verified MP4 muxer remain unimplemented.
+MP4 output is encoded from the stored ASCII frame pages on the deterministic 100 ms timeline using WebCodecs H.264 and Mediabunny's MP4 muxer. For a loaded source video, audio is demuxed from the original file (not recorded from playback), decoded and re-encoded as AAC, clipped to the frame timeline, and muxed as a synchronized track. When exporting an imported `.ascii` document, its embedded audio is used instead. Chromium E2E confirms source-video MP4 contains H.264/AAC tracks, matches the source duration within 100 ms, and decodes successfully. A silent-video regression verifies video-only MP4 is supported. On unsupported devices, the app checks codec capability and reports an explicit error instead of emitting an invalid file. Safari is not yet part of the automated test matrix.
 
 ## Additional limitations
 
-- Video audio extraction for `.ascii` uses `HTMLMediaElement.captureStream()` and MediaRecorder with WebM/Opus. It is browser-dependent and runs in real time; browsers without capture or a supported audio recorder report an error. Video frame sampling itself remains deterministic.
+- Video audio extraction for `.ascii` uses `HTMLMediaElement.captureStream()` and MediaRecorder; MIME selection prefers WebM/Opus and also accepts MP4/AAC. It is browser-dependent and runs in real time; browsers without capture or a supported audio recorder report the omission. Video frame sampling itself remains deterministic.
 - Bitmap HTML retains its existing system-font dependency and can differ across systems. Vector HTML is font-independent because it embeds used outline paths; font choices are bundled SIL OFL 1.1 assets for reproducible outlines.
 - Vector preview uses Canvas 2D `Path2D`, not WebGL, so large grids and video can render more slowly than bitmap mode.
 - Video page sampling is fixed at 10 fps, not source-native frame rate. It preserves the sampled timeline/duration but cannot represent motion faster than the sampling interval.
 - The former 20-million-cumulative-cell ceiling has been removed. Long exports allocate page text and optional audio bytes in memory; video exports remain capped at 30 minutes and can be cancelled. Browser memory and compressed/expanded document size caps can still constrain very large files; compression itself has no fine-grained progress reporting.
-- MP4, browser matrix, and measured performance coverage remain release work.
+- Safari/Firefox/WebKit matrix and measured performance coverage remain release work.
 
 ## Format and implementation references
 
