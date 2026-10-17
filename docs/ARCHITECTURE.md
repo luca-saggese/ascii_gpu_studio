@@ -8,9 +8,13 @@ Cell count is capped at 40,000. Glyph density, advance width, ascent, and descen
 
 The glyph atlas uses a fixed 20 px internal font size and is rasterized at 4× device-pixel ratio, up to 8×, preserving logical font metrics and subject to the GPU's maximum texture dimensions. Font size is not a user control: output detail is controlled by grid columns (32–320 in the Studio) and charset. Atlas sampling accounts for the vertical flip applied during upload so glyphs remain upright. The framebuffer uses one uniform scale based on the grid's measured aspect ratio and available preview space; it never independently stretches width and height. Atlas samples are inset by half a texel to avoid adjacent-glyph bleeding under linear filtering. The status bar reports actual framebuffer pixels separately from source dimensions and cell count. An alternate plain-text preview builds a normal monospace text grid on demand; video updates in this mode use CPU canvas sampling at up to 8 fps and can be slower than GPU preview.
 
+Exports share a versioned ASCII result model. `src/ascii-export.js` samples video on a fixed 100 ms seek timeline (not preview callbacks), optionally records its native audio track, and builds full text/color pages. `src/ascii-document.js` validates and serializes that model as gzip JSON. `src/ascii-render.js` rasterizes a page to the configured cell dimensions for PNG (OffscreenCanvas worker where supported); `src/templates/playable-template.js` embeds the same compressed model and renderer in a standalone offline HTML player.
+
+MP4 output is surfaced in the menu for video sources but is rejected with an explicit capability error unless a deterministic encoder and MP4 muxer are available. The tested Chromium exposes real-time `MediaRecorder` MP4 but not WebCodecs; a real-time recorder cannot guarantee the deterministic frame timeline, so it is deliberately not used as an MP4 fallback.
+
 ## Decisions
 
 - No remote font/CDN dependency: privacy and offline operation outweigh decorative font matching; the interface uses system fonts.
 - Node 24.20.0 is pinned in `.nvmrc`, matching the implementation environment.
-- ZIP container is implemented with fflate and a 110 MiB compressed / 200 MiB expanded limit. Extraction is streamed and bounded during decompression, with path and entry-count checks.
+- Legacy ZIP-based `.ascii` projects remain importable with fflate's 110 MiB compressed / 200 MiB expanded limits and path/entry-count checks. New `.ascii` exports are gzip-compressed UTF-8 JSON and contain no source media.
 - The GPU implementation uses a single pass rather than a separate preprocess FBO to avoid frame readback and pass overhead. It samples a 3×3 neighborhood for an inexpensive area approximation.

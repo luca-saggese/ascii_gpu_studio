@@ -2,10 +2,17 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { DEFAULT_SCENE } from './core.js';
 import { createAsciiRenderer } from './renderer.js';
-import { exportAscii, readAscii } from './format.js';
+import { readAscii } from './format.js';
+import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-document.js';
+import { captureAsciiDocument } from './ascii-export.js';
+import { renderAsciiPng } from './ascii-render.js';
+import { createPlayableHtml } from './templates/playable-template.js';
+import { assertDeterministicMp4Support } from './mp4-export.js';
 
 const canvas = ref(null);
 const picker = ref(null);
+const exportMenu = ref(null);
+const exportButton = ref(null);
 const video = ref(null);
 const scene = ref(structuredClone(DEFAULT_SCENE));
 const mediaFile = ref(null);
@@ -13,6 +20,7 @@ const mediaName = ref('');
 const mediaKind = ref('');
 const mediaUrl = ref('');
 const mediaSize = ref({ width: 0, height: 0 });
+const asciiDocument = ref(null);
 const statsLabel = ref({ columns: 0, rows: 0, outputWidth: 0, outputHeight: 0, backend: 'WebGL2' });
 const playing = ref(false);
 const currentTime = ref(0);
@@ -20,6 +28,9 @@ const duration = ref(0);
 const error = ref('');
 const message = ref('');
 const busy = ref(false);
+const exportProgress = ref(0);
+const exportAbort = ref(null);
+const exportMenuOpen = ref(false);
 const renderer = ref(null);
 const activeTab = ref('controls');
 const asciiMode = ref(false);
@@ -31,6 +42,7 @@ let lastScene = JSON.stringify(scene.value);
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
 const durationLabel = computed(() => formatTime(duration.value));
+const hasContent = computed(() => Boolean(mediaFile.value || asciiDocument.value));
 
 function formatTime(seconds) {
   const value = Number.isFinite(seconds) ? seconds : 0;
@@ -66,11 +78,36 @@ async function initializeRenderer() {
 }
 
 async function importFile(file) {
-  if (!file) return;
+  if (!file || busy.value) return;
   error.value = '';
   if (file.name.toLowerCase().endsWith('.ascii')) {
     try {
-      const project = await readAscii(new Uint8Array(await file.arrayBuffer()));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        const project = await deserializeAsciiDocument(bytes);
+        pauseVideo();
+        video.value?.removeAttribute('src');
+        video.value?.load();
+        if (mediaUrl.value) URL.revokeObjectURL(mediaUrl.value);
+        mediaUrl.value = '';
+        mediaFile.value = null;
+        asciiDocument.value = project;
+        mediaName.value = file.name;
+        mediaKind.value = project.contentType;
+        mediaSize.value = {
+          width: project.render.width,
+          height: project.render.height,
+        };
+        asciiText.value = project.frames[0].text;
+        asciiMode.value = true;
+        currentTime.value = 0;
+        duration.value =
+          Math.max(...project.frames.map((frame) => frame.timestampMs + frame.durationMs)) / 1000;
+        notify('Documento ASCII caricato');
+        return;
+      }
+      const project = await readAscii(bytes);
+      asciiDocument.value = null;
       scene.value = project.scene;
       const restored = new File([project.media], project.manifest.media.path.split('/').pop(), {
         type: project.manifest.media.mime,
@@ -95,6 +132,7 @@ async function importFile(file) {
 
 async function loadMedia(file) {
   if (mediaUrl.value) URL.revokeObjectURL(mediaUrl.value);
+  asciiDocument.value = null;
   mediaFile.value = file;
   mediaName.value = file.name;
   mediaKind.value = file.type.startsWith('video/') ? 'video' : 'image';
@@ -200,6 +238,7 @@ function onVideoEnded() {
 }
 
 function dropFile(event) {
+  if (busy.value) return;
   const file = event.dataTransfer?.files?.[0];
   if (file) importFile(file);
 }
@@ -226,32 +265,66 @@ watch(
   { deep: true },
 );
 
-async function saveProject() {
-  if (!mediaFile.value) return;
-  busy.value = true;
+function exportBaseName() {
+  return mediaName.value.replace(/\.(ascii|[^.]+)$/i, '') || 'ascii-art';
+}
+
+async function buildExportDocument() {
+  if (asciiDocument.value) return asciiDocument.value;
+  if (!renderer.value || !mediaFile.value) throw new Error('Carica prima un’immagine o un video.');
+  const wasPlaying = mediaKind.value === 'video' && !video.value.paused;
+  if (wasPlaying) pauseVideo();
+  const controller = new AbortController();
+  exportAbort.value = controller;
   try {
-    const preview = renderer.value ? await renderer.value.capturePng() : null;
-    const blob = await exportAscii({
+    return await captureAsciiDocument({
+      renderer: renderer.value,
       scene: scene.value,
-      file: mediaFile.value,
-      title: mediaName.value.replace(/\.[^.]+$/, ''),
-      preview,
+      kind: mediaKind.value,
+      video: mediaKind.value === 'video' ? video.value : null,
+      signal: controller.signal,
+      onProgress: (progress) => {
+        exportProgress.value = Math.min(100, Math.round(progress * 100));
+      },
     });
-    download(blob, `${mediaName.value.replace(/\.[^.]+$/, '')}.ascii`);
-  } catch (err) {
-    error.value = err.message;
   } finally {
+    exportAbort.value = null;
+    if (wasPlaying) playVideo();
+  }
+}
+
+async function performExport(kind) {
+  if (!hasContent.value || busy.value) return;
+  exportMenuOpen.value = false;
+  busy.value = true;
+  exportProgress.value = 0;
+  error.value = '';
+  try {
+    if (kind === 'mp4') {
+      assertDeterministicMp4Support();
+      return;
+    }
+    const model = await buildExportDocument();
+    if (kind === 'ascii') {
+      const bytes = await serializeAsciiDocument(model);
+      download(new Blob([bytes], { type: 'application/gzip' }), `${exportBaseName()}.ascii`);
+    } else if (kind === 'png') {
+      download(await renderAsciiPng(model), `${exportBaseName()}.png`);
+    } else if (kind === 'html') {
+      download(await createPlayableHtml(model), `${exportBaseName()}-playable.html`);
+    }
+    notify('Export completato');
+  } catch (err) {
+    if (err.name !== 'AbortError') error.value = err.message;
+    else notify('Esportazione annullata');
+  } finally {
+    exportAbort.value = null;
     busy.value = false;
   }
 }
 
-async function savePng() {
-  if (!renderer.value) return;
-  try {
-    download(await renderer.value.capturePng(), 'ascii-gpu-preview.png');
-  } catch (err) {
-    error.value = err.message;
-  }
+function cancelExport() {
+  exportAbort.value?.abort();
 }
 
 function download(blob, name) {
@@ -267,7 +340,45 @@ function resetScene() {
   scene.value = structuredClone(DEFAULT_SCENE);
 }
 
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
+  document.addEventListener('pointerdown', onOutsideExportClick);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('pointerdown', onOutsideExportClick);
+  cancelExport();
+  pauseVideo();
+  observer?.disconnect();
+  renderer.value?.dispose();
+  if (mediaUrl.value) URL.revokeObjectURL(mediaUrl.value);
+});
+
+function onOutsideExportClick(event) {
+  if (!exportMenu.value?.contains(event.target)) exportMenuOpen.value = false;
+}
+
+function onExportMenuKeydown(event) {
+  const options = [...exportMenu.value.querySelectorAll('[role="menuitem"]:not(:disabled)')];
+  const index = options.indexOf(document.activeElement);
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const offset = event.key === 'ArrowDown' ? 1 : -1;
+    options[(index + offset + options.length) % options.length]?.focus();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    exportMenuOpen.value = false;
+    exportButton.value?.focus();
+  }
+}
+
 function onKeydown(event) {
+  if (event.key === 'Escape' && exportMenuOpen.value) {
+    event.preventDefault();
+    exportMenuOpen.value = false;
+    exportButton.value?.focus();
+    return;
+  }
   const target = event.target;
   const typing =
     target instanceof HTMLElement &&
@@ -277,23 +388,12 @@ function onKeydown(event) {
     picker.value?.click();
   } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault();
-    saveProject();
+    performExport('ascii');
   } else if (event.code === 'Space' && !typing && mediaKind.value === 'video') {
     event.preventDefault();
     playing.value ? pauseVideo() : playVideo();
   }
 }
-
-onMounted(() => {
-  window.addEventListener('keydown', onKeydown);
-});
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown);
-  pauseVideo();
-  observer?.disconnect();
-  renderer.value?.dispose();
-  if (mediaUrl.value) URL.revokeObjectURL(mediaUrl.value);
-});
 </script>
 
 <template>
@@ -308,7 +408,7 @@ onBeforeUnmount(() => {
       <div class="top-actions">
         <button
           class="icon-button"
-          :disabled="!mediaFile"
+          :disabled="!mediaFile || busy"
           title="Reset settings"
           aria-label="Reset settings"
           @click="resetScene"
@@ -317,13 +417,66 @@ onBeforeUnmount(() => {
         </button>
         <span class="top-divider" />
         <button class="button subtle" @click="picker?.click()">Open file <kbd>⌘O</kbd></button>
-        <button class="button primary" :disabled="!mediaFile || busy" @click="saveProject">
-          <span>↓</span> Export <kbd>⌘S</kbd>
-        </button>
+        <div ref="exportMenu" class="export-menu-wrap">
+          <button
+            ref="exportButton"
+            class="button primary"
+            :disabled="!hasContent || busy"
+            aria-haspopup="menu"
+            :aria-expanded="exportMenuOpen"
+            aria-controls="export-menu"
+            @click="exportMenuOpen = !exportMenuOpen"
+            @keydown.arrow-down.prevent="
+              exportMenuOpen = true;
+              nextTick(() => exportMenu?.querySelector('[role=menuitem]')?.focus());
+            "
+          >
+            <span>↓</span> Export <kbd>⌘S</kbd>
+          </button>
+          <div
+            v-if="exportMenuOpen"
+            id="export-menu"
+            class="export-menu"
+            role="menu"
+            aria-label="Export options"
+            @keydown="onExportMenuKeydown"
+          >
+            <button role="menuitem" :disabled="busy" @click="performExport('ascii')">
+              Export ASCII
+            </button>
+            <button
+              v-if="mediaKind === 'image'"
+              role="menuitem"
+              :disabled="busy"
+              @click="performExport('png')"
+            >
+              Export PNG
+            </button>
+            <button
+              v-else-if="mediaKind === 'video'"
+              role="menuitem"
+              :disabled="busy"
+              @click="performExport('mp4')"
+            >
+              Export video (.mp4)
+            </button>
+            <button role="menuitem" :disabled="busy" @click="performExport('html')">
+              Export HTML playable
+            </button>
+          </div>
+        </div>
+        <div v-if="busy" class="export-progress" role="status" aria-live="polite">
+          <span>{{ exportProgress }}%</span>
+          <button class="button subtle" @click="cancelExport">Cancel</button>
+        </div>
       </div>
     </header>
     <div class="workspace">
-      <aside class="sidebar" :class="{ 'mobile-hidden': activeTab === 'preview' }">
+      <aside
+        class="sidebar"
+        :class="{ 'mobile-hidden': activeTab === 'preview' }"
+        :inert="busy || Boolean(asciiDocument)"
+      >
         <div class="panel-heading">
           <div>
             <span class="eyebrow">WORKSPACE</span>
@@ -337,7 +490,7 @@ onBeforeUnmount(() => {
             <h2>Source</h2>
             <span class="section-line" />
           </div>
-          <button v-if="!mediaFile" class="source-drop" @click="picker?.click()">
+          <button v-if="!hasContent" class="source-drop" @click="picker?.click()">
             <span class="upload-icon">↑</span><strong>Choose a file</strong
             ><span>Image or video · up to 100 MB</span>
           </button>
@@ -347,7 +500,9 @@ onBeforeUnmount(() => {
               ><strong>{{ mediaName }}</strong
               ><small
                 >{{ mediaSize.width }} × {{ mediaSize.height }} ·
-                {{ (mediaFile.size / 1048576).toFixed(1) }} MB</small
+                {{
+                  mediaFile ? `${(mediaFile.size / 1048576).toFixed(1)} MB` : 'ASCII document'
+                }}</small
               ></span
             ><button class="icon-button small" aria-label="Replace source" @click="picker?.click()">
               ↻
@@ -480,18 +635,15 @@ onBeforeUnmount(() => {
             ><strong>{{ mediaName || 'Untitled study' }}</strong>
           </div>
           <div class="stage-actions">
-            <div class="view-switch" role="group" aria-label="Preview mode">
+            <div v-if="mediaFile" class="view-switch" role="group" aria-label="Preview mode">
               <button :class="{ selected: !asciiMode }" @click="asciiMode = false">GPU</button>
               <button :class="{ selected: asciiMode }" @click="asciiMode = true">ASCII text</button>
             </div>
-            <span class="render-badge"><i /> {{ asciiMode ? 'TEXT' : 'WebGL2' }}</span
-            ><button class="button subtle" :disabled="!mediaFile" @click="savePng">
-              Export PNG <span class="download-icon">↓</span>
-            </button>
+            <span class="render-badge"><i /> {{ asciiMode ? 'TEXT' : 'WebGL2' }}</span>
           </div>
         </div>
         <div class="stage-wrap" @dragover.prevent @drop.prevent="dropFile">
-          <div v-if="!mediaFile" class="empty-state">
+          <div v-if="!hasContent" class="empty-state">
             <div class="empty-orbit"><span>Ａ</span><i class="orbit-dot" /></div>
             <span class="eyebrow">YOUR CREATIVE CANVAS</span>
             <h2>Turn pixels into<br /><em>something different.</em></h2>
@@ -506,12 +658,12 @@ onBeforeUnmount(() => {
               <span>PNG</span><span>JPG</span><span>WEBP</span><span>MP4</span><span>WEBM</span>
             </div>
           </div>
-          <div v-else v-show="!asciiMode" class="canvas-frame">
+          <div v-else-if="mediaFile" v-show="!asciiMode" class="canvas-frame">
             <canvas ref="canvas" aria-label="ASCII rendering preview" />
             <div class="canvas-label"><i /> LIVE PREVIEW</div>
           </div>
           <div
-            v-if="mediaFile && asciiMode"
+            v-if="hasContent && (asciiMode || asciiDocument)"
             class="ascii-preview"
             :style="{
               '--columns': statsLabel.columns,
@@ -535,8 +687,8 @@ onBeforeUnmount(() => {
         <div class="stage-status">
           <span
             ><i class="status-dot" />
-            {{ mediaFile ? `${mediaSize.width} × ${mediaSize.height}` : 'Ready to create' }}</span
-          ><span v-if="mediaFile"
+            {{ hasContent ? `${mediaSize.width} × ${mediaSize.height}` : 'Ready to create' }}</span
+          ><span v-if="hasContent"
             >{{ statsLabel.columns }} × {{ statsLabel.rows }} <span class="muted">cells</span>
             <span v-if="statsLabel.outputWidth" class="muted"
               >·
@@ -546,9 +698,11 @@ onBeforeUnmount(() => {
                   : `${statsLabel.renderWidth} × ${statsLabel.renderHeight} GPU px`
               }}</span
             ></span
-          ><span class="status-right">100% <span class="muted">·</span> GPU accelerated</span>
+          ><span class="status-right">{{
+            asciiDocument ? 'ASCII document' : '100% · GPU accelerated'
+          }}</span>
         </div>
-        <div v-if="mediaKind === 'video'" class="video-controls">
+        <div v-if="mediaFile && mediaKind === 'video'" class="video-controls" :inert="busy">
           <button
             class="play-button"
             :aria-label="playing ? 'Pause video' : 'Play video'"
@@ -602,8 +756,8 @@ onBeforeUnmount(() => {
       <button :class="{ active: activeTab === 'preview' }" @click="activeTab = 'preview'">
         Preview</button
       ><button :class="{ active: activeTab === 'controls' }" @click="activeTab = 'controls'">
-        Controls</button
-      ><button @click="mediaFile && saveProject()">Export</button>
+        Controls
+      </button>
     </nav>
     <input
       ref="picker"

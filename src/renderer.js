@@ -147,6 +147,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const descent = Math.max(
       ...metrics.map((metric) => metric.actualBoundingBoxDescent || fontSize * 0.2),
     );
+    tile.ascent = ascent;
+    tile.descent = descent;
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
     atlasScale = Math.max(
@@ -306,10 +308,12 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const pixels = context.getImageData(0, 0, grid.columns, grid.rows).data;
     const glyphs = atlas.chars;
     let text = '';
+    const cellColors = currentScene.appearance.mode === 'rgb' ? [] : null;
     for (let y = 0; y < grid.rows; y += 1) {
       for (let x = 0; x < grid.columns; x += 1) {
         const offset = (y * grid.columns + x) * 4;
         const alpha = pixels[offset + 3] / 255;
+        if (cellColors) cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
         let luminance =
           (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
           255;
@@ -338,6 +342,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       cellHeight: tile.height,
       atlasScale,
       fontSize,
+      ascent: tile.ascent,
+      descent: tile.descent,
+      cellColors,
     };
   }
 

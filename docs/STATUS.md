@@ -6,7 +6,7 @@ Latest verified implementation commit: `e835d84` (`fix(renderer): sample complet
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (116.15 kB JS, 13.16 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (6 Chromium scenarios, including fixed font control, 320-column limit, high-resolution atlas, dark-to-dense glyph mapping, distinct glyph masks, and source audio decode).
+Latest verification: `pnpm lint`, `pnpm test` (8 tests), `pnpm build`, and `pnpm format:check` pass. E2E: 6/7 pass; the image export workflow stalls waiting for the PNG download after re-importing a gzip `.ascii` document. A focused rerun reproduced the timeout at 60 seconds. This is not release-ready until diagnosed and fixed.
 
 ## Works now
 
@@ -15,14 +15,19 @@ Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm 
 - Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
-- `.ascii` v1 ZIP export/import containing manifest, original source, preview PNG, and settings; streaming path/entry/expanded-size checks.
+- New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM audio, and compact per-cell RGB. Legacy ZIP projects remain importable.
+- A single keyboard-accessible Export dropdown offers ASCII, contextual PNG/MP4, and standalone offline HTML. It supports Escape/outside click and reports cancellable progress for video conversion.
+- PNG rasterizes the ASCII document at configured cell resolution in an OffscreenCanvas worker when available; the same drawing function is embedded in the offline HTML player.
+- Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
-- Chromium E2E covers empty state, responsive widths, image render/parameter change, `.ascii` export/import, PNG signature, malicious traversal rejection, Vue runtime, and video controls.
+- MP4 is intentionally not emitted in this environment: Chromium reports MediaRecorder MP4 support but has no WebCodecs, and a verified MP4 muxer is not bundled. The UI reports this accurately instead of making a nondeterministic real-time recording.
+- Chromium E2E covers video frame timings with and without audio, HTML audio playback/seek offline, MP4 capability errors, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls. Image ASCII export/import passes, but the subsequent PNG download in that E2E currently hangs.
 
 ## Does not work / not claimed
 
 - Edge-aware/perceptual selection, temporal hysteresis, custom charset text entry, editing/history/undo, presets, custom font uploads, TXT/SVG export.
-- WebM export and video frame-step; audio playback is the original `<video>` audio track only. The synthetic Opus stream is confirmed decoded during native video playback; audible output still depends on browser/device audio policy.
+- Deterministic MP4 export awaits WebCodecs plus a verified muxer. HTML player fonts use the installed local monospace family rather than embedding a font file.
+- Exported video audio is captured to WebM/Opus via `captureStream` and MediaRecorder; browser support varies, and unsupported capture/codec paths return explicit errors. Native Studio playback continues using the original video audio track.
 - React/Web Component packages, external Vue consumer install/publish, Canvas2D fallback, WebGL context restoration.
 - CI/browser matrix, screen-reader audit, quantitative performance/memory benchmarks, and hand-reviewed screenshots on other operating systems.
 - `.ascii` hard limits prevent oversized extraction, but the implementation still holds extracted file bytes in memory; archives are local, not streamed from remote storage.
@@ -31,7 +36,7 @@ Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm 
 ## Known limits
 
 - WebGL2 is required; unavailable contexts show an error and do not fall back.
-- Browser codec support/autoplay policy governs video. Source file cap 100 MiB; ZIP cap 110 MiB compressed, 200 MiB expanded, 32 entries.
+- Browser codec support/autoplay policy governs video. Source file cap 100 MiB; legacy ZIP imports cap 110 MiB compressed, 200 MiB expanded, 32 entries. New `.ascii` gzip JSON export is not source-size bounded after compression.
 - `@ascii-gpu/vue` is currently a local workspace source package, not yet a standalone publishable package.
 - The image preview stores the original media but handles EXIF/magic-byte validation and unusual color profiles are not yet hardened.
 

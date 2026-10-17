@@ -24,7 +24,7 @@ ASCII GPU Studio è un'applicazione web per esplorare e rifinire conversioni ASC
 - **Rendering WebGL2** — atlante dei glifi rasterizzato ad alta risoluzione (4×–8×, nei limiti della GPU), selezione della densità e proporzioni delle celle basate sulle metriche del font.
 - **Controlli di resa** — regola charset, griglia da 32 a 320 colonne, famiglia del font, modalità colore, contrasto, luminosità, inversione e adattamento dell'immagine. La dimensione dei caratteri è gestita automaticamente.
 - **Anteprima ASCII testuale** — passa dalla preview GPU al testo monospace normale, pronto da selezionare e copiare.
-- **Esportazione** — salva un progetto `.ascii` con sorgente, impostazioni e miniatura oppure esporta la preview in PNG.
+- **Esportazione** — un menu unico offre `.ascii` gzip portabile, PNG per le immagini e HTML playable offline. Per i video propone MP4 e mostra un errore esplicito se il browser non supporta encoding deterministico.
 - **Player Vue riutilizzabile** — nel repository trovi il componente e un esempio funzionante.
 
 ## Avvio rapido
@@ -36,7 +36,7 @@ pnpm install
 pnpm dev
 ```
 
-Apri l'indirizzo locale mostrato da Vite, quindi importa un'immagine o un video. Regola la resa dal pannello laterale e usa **Export** per salvare il progetto modificabile o **Export PNG** per l'immagine renderizzata.
+Apri l'indirizzo locale mostrato da Vite, quindi importa un'immagine o un video. Regola la resa dal pannello laterale e scegli il formato dal menu **Export**.
 
 ## Verifiche
 
@@ -54,11 +54,11 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
-La suite copre rendering WebGL2, densità dei glifi, anteprima testuale, esportazione/importazione `.ascii`, PNG, player Vue e controlli video. L'audio viene riprodotto dal media element nativo: l'uscita udibile dipende dalle policy del browser e del dispositivo.
+La suite copre rendering WebGL2, densità dei glifi, anteprima testuale, `.ascii` gzip, PNG, HTML offline, player Vue e controlli video. Verifica anche pagine video a timestamp fissi e audio WebM incorporato. L'audio riprodotto dal browser resta soggetto alle sue policy e a quelle del dispositivo.
 
 ## Formato `.ascii`
 
-Il progetto `.ascii` è un archivio ZIP versionato che contiene il manifest, il media originale, le impostazioni della scena e una miniatura PNG. L'importazione applica limiti a dimensione, numero di elementi e percorsi estratti. I file restano sul dispositivo.
+Il nuovo `.ascii` è JSON UTF-8 compresso con gzip: contiene le pagine ASCII, le dimensioni e lo stile necessari a riprodurle, ma non il media originale. Per i video conserva pagine con timestamp e, se disponibile, l'audio estratto. I vecchi progetti ZIP restano importabili. Vedi [specifica formato](docs/FILE_FORMAT.md).
 
 ## Stack
 
@@ -66,7 +66,7 @@ JavaScript ES Modules · Vue 3 · Vite · WebGL2 · Canvas 2D · Playwright
 
 ## Stato del progetto
 
-Lo Studio è funzionante, ma non tutte le funzionalità previste sono state implementate. In particolare, non sono ancora disponibili esportazione WebM/TXT/SVG, cronologia undo/redo, selezione edge-aware, ripristino del contesto WebGL e una matrice E2E Firefox/WebKit. Il componente Vue è un esempio interno al repository, non ancora un pacchetto pronto per la pubblicazione indipendente.
+Lo Studio è funzionante, ma non tutte le funzionalità previste sono state implementate. L'export MP4 deterministico è attualmente non disponibile: il Chromium verificato non espone WebCodecs e l'app non ripiega su una registrazione in tempo reale che può perdere frame. Restano inoltre da implementare cronologia undo/redo, selezione edge-aware, ripristino del contesto WebGL e una matrice E2E Firefox/WebKit. Il player HTML usa il font monospace installato sul dispositivo, senza incorporare font binari.
 
 - [Stato e prossimi interventi](docs/STATUS.md)
 - [Backlog](docs/TODO.md)

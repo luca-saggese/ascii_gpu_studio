@@ -162,6 +162,45 @@ select:focus-visible {
   border-left: 1px solid #303635;
   margin: 0 4px;
 }
+.export-menu-wrap {
+  position: relative;
+}
+.export-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 208px;
+  padding: 5px;
+  display: grid;
+  gap: 2px;
+  background: #171c1d;
+  border: 1px solid #303938;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px #0009;
+}
+.export-menu [role='menuitem'] {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  text-align: left;
+  color: #dce4e1;
+  font-size: 11px;
+}
+.export-menu [role='menuitem']:hover:not(:disabled),
+.export-menu [role='menuitem']:focus-visible {
+  background: #252e2c;
+  color: var(--teal);
+}
+.export-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--teal);
+  font: 11px var(--mono);
+}
 .icon-button {
   border: 0;
   background: transparent;

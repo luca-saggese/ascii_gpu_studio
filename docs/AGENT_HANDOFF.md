@@ -4,7 +4,7 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
-Latest verified commit: `58325f3`; current working tree removes the font-size slider, fixes internal glyph font size at 20 px, increases atlas raster scale to 4× device-pixel ratio up to 8× subject to GPU texture limits, and expands the Studio columns control to 320. Verified: lint, 5 unit tests, production build, format check, and all 6 Chromium E2E scenarios.
+The single export menu and gzip JSON ASCII document are implemented. It includes deterministic 100 ms video seeking, optional source-audio capture, worker-rendered PNG, and a self-contained offline HTML player. The MP4 option reports unsupported in this Chromium rather than using real-time recording. Latest lint, unit tests, build, and format checks pass. The complete E2E run has one reproducible failure: after importing the exported `.ascii` image document, the PNG export never dispatches a download (60-second focused timeout).
 
 ## First files to read
 
@@ -38,4 +38,4 @@ No WebGL context restoration/fallback, audio acoustic assertion, other-browser E
 
 ## Resume
 
-The latest UI/renderer changes have passed the full local check set. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.
+Do not describe MP4 generation as implemented: this environment lacks WebCodecs and no MP4 muxer is bundled. Diagnose and fix the PNG worker/export hang after `.ascii` import before claiming the export workflow passes. Do not describe M6 as complete until the E2E issue and outstanding security, cross-browser, accessibility, and release checks are evidenced.

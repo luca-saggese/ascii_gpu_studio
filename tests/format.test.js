@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { File } from 'node:buffer';
-import { strToU8, zipSync } from 'fflate';
+import { gunzipSync, strFromU8, strToU8, zipSync } from 'fflate';
 import { DEFAULT_SCENE } from '../src/core.js';
 import { exportAscii, readAscii } from '../src/format.js';
+import { deserializeAsciiDocument, serializeAsciiDocument } from '../src/ascii-document.js';
+import { createPlayableHtml } from '../src/templates/playable-template.js';
 
 describe('.ascii project format', () => {
   it('round trips a media file and its scene', async () => {
@@ -14,6 +16,54 @@ describe('.ascii project format', () => {
     expect(result.manifest.asset.title).toBe('Sample');
     expect(result.scene.grid.columns).toBe(133);
     expect([...result.media]).toEqual([1, 2, 3]);
+  });
+
+  describe('portable ASCII result format', () => {
+    const sample = {
+      format: 'ascii-gpu-studio',
+      version: 1,
+      contentType: 'image',
+      render: {
+        columns: 3,
+        rows: 1,
+        cellWidth: 12,
+        cellHeight: 20,
+        width: 36,
+        height: 20,
+        cellAspect: 0.6,
+        font: { family: 'monospace', size: 20, weight: 500, ascent: 15, descent: 4 },
+        colors: { mode: 'mono', foreground: '#ffffff', background: '#000000' },
+        fit: 'contain',
+      },
+      frames: [{ timestampMs: 0, durationMs: 0, text: '<&>' }],
+    };
+
+    it('stores gzip JSON and round-trips special ASCII data without base64 encoding the frame', async () => {
+      const bytes = await serializeAsciiDocument(sample);
+      expect([...bytes.slice(0, 2)]).toEqual([0x1f, 0x8b]);
+      const raw = strFromU8(gunzipSync(bytes));
+      expect(raw).toContain('"text":"<&>"');
+      expect(raw).not.toContain(btoa('<&>'));
+      expect(await deserializeAsciiDocument(bytes)).toEqual(sample);
+    });
+
+    it('embeds only the compressed ASCII payload in a self-contained playable page', async () => {
+      const html = await createPlayableHtml(sample);
+      const source = await html.text();
+      expect(source).toContain('DecompressionStream');
+      expect(source).toContain('textContent');
+      expect(source).not.toContain('<&>');
+      expect(source).not.toContain('https://');
+    });
+
+    it('rejects an image result with multiple frames or audio', async () => {
+      await expect(
+        serializeAsciiDocument({
+          ...sample,
+          frames: [...sample.frames, sample.frames[0]],
+        }),
+      ).rejects.toThrow(/immagine/);
+    });
   });
 
   it('rejects path traversal and invalid manifests', async () => {
