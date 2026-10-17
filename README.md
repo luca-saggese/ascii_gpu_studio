@@ -28,6 +28,7 @@ ASCII GPU Studio è un'applicazione web per esplorare e rifinire conversioni ASC
 - **Parametri predefiniti** — salva localmente le impostazioni correnti e ripristinale nelle sessioni successive.
 - **Anteprima ASCII testuale** — passa dalla preview GPU al testo monospace normale, pronto da selezionare e copiare.
 - **Esportazione** — un menu unico offre `.ascii` gzip portabile, PNG per le immagini e HTML playable offline. Per i video propone MP4 e mostra un errore esplicito se il browser non supporta encoding deterministico.
+- **Player per terminale** — `tools/play_ascii.py` riproduce i video `.ascii` centrati e ritagliati sul terminale, segue i timestamp senza accumulare ritardo e riproduce l'audio incorporato tramite FFplay.
 - **Player Vue riutilizzabile** — nel repository trovi il componente e un esempio funzionante.
 
 ## Avvio rapido
@@ -40,6 +41,18 @@ pnpm dev
 ```
 
 Apri l'indirizzo locale mostrato da Vite, quindi importa un'immagine o un video. Regola la resa dal pannello laterale e scegli il formato dal menu **Export**.
+
+### Riproduzione nel terminale
+
+Requisiti: Python 3. Il video segue automaticamente i timestamp del documento e scarta i frame in ritardo; `--fps` imposta un limite massimo di aggiornamento. Per riprodurre l'audio incorporato installa FFmpeg/FFplay.
+
+```sh
+python3 tools/play_ascii.py video.ascii
+python3 tools/play_ascii.py video.ascii --fps 24
+python3 tools/play_ascii.py video.ascii --no-audio --no-color
+```
+
+L'audio è opzionale nel formato `.ascii`: i file senza traccia vengono riprodotti usando il solo orologio monotono. Il player terminale sincronizza i frame ai timestamp con un orologio monotono; l'avvio audio esterno e la latenza del dispositivo possono introdurre un piccolo scarto iniziale.
 
 ## Verifiche
 
@@ -58,6 +71,8 @@ pnpm test:e2e
 ```
 
 La suite copre rendering WebGL2, densità dei glifi, contorni vettoriali e cavità, caratteri accentati/punteggiatura, anteprima testuale, `.ascii` gzip, PNG, HTML offline, player Vue e controlli video. Verifica anche pagine video a timestamp fissi e audio WebM incorporato. L'audio riprodotto dal browser resta soggetto alle sue policy e a quelle del dispositivo.
+
+I test del player Python si eseguono con `python3 -m unittest discover -s tools -p 'test_*.py'`.
 
 ## Formato `.ascii`
 

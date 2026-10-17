@@ -6,7 +6,9 @@ Latest committed implementation: `240ddb2` (`fix(export): mux source video audio
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification after shared content-layout work: `pnpm lint`, `pnpm test` (16 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (17 Chromium tests) all pass. Browser regressions cover horizontal/vertical/square sources, identical bitmap/vector logical dimensions, responsive resize, PNG and offline fullscreen dimensions/contain, MP4 source audio, and silent MP4. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+
+Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnpm format:check` pass. The Chromium run passes 16 tests, including strict B/W preview/export coverage; its remaining source-audio MP4 test cannot download because this installed browser lacks AAC WebCodecs encoding, and the Studio reports that capability limit. Safari is not included in the browser matrix. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+
 
 ## Works now
 
@@ -16,6 +18,7 @@ Latest verification after shared content-layout work: `pnpm lint`, `pnpm test` (
 - One shared source layout measures integer font cells, fits complete rows/columns into 1024×576 while preserving source aspect, and drives WebGL, vector, fallback, ASCII capture, PNG, MP4, and HTML. Resize changes only display scale; logical dimensions and exports remain fixed. MP4 adds even-dimension padding only on the right/bottom.
 - Toggle between WebGL output and normal monospace ASCII text. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit; DPR affects only preview buffer resolution.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
+- Added a separate Black & white appearance mode: hard luminance thresholding selects only lightest/densest glyphs, forces white ink on black, and removes antialiased gray pixels from bitmap/vector previews and exports.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
 - Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.
@@ -31,6 +34,7 @@ Latest verification after shared content-layout work: `pnpm lint`, `pnpm test` (
 - Vector preview uses Canvas 2D path rasterization rather than WebGL; large grids and video can therefore be slower than bitmap preview.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
+- `tools/play_ascii.py` plays `.ascii` videos in the terminal, centers/crops frames to terminal dimensions, follows source timestamps while dropping late frames, supports an optional FPS ceiling, and plays embedded audio through FFplay. The standalone script requires Python 3; audio playback requires FFplay.
 - MP4 export uses Mediabunny to mux deterministic ASCII-rendered H.264 frames and, when available, AAC audio into a real MP4. For source videos it demuxes audio directly from the original local file; imported `.ascii` documents use their embedded audio. Encoder support is checked at the selected dimensions; unsupported codecs report an explicit capability error instead of producing a mislabeled file.
 - Chromium E2E covers the panel's bounded scrolling and collapsible groups, live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, playable H.264/AAC MP4 with audio and silent MP4, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
 
@@ -49,6 +53,7 @@ Latest verification after shared content-layout work: `pnpm lint`, `pnpm test` (
 - Canvas 2D fallback preserves the preview when WebGL2 is unavailable, but CPU conversion can be slower, especially for video and high column counts. WebGL2 remains recommended for performance.
 - Video ASCII export captures optional audio in real time before deterministic 100 ms frame conversion; long clips can therefore remain time-consuming even after the CPU filter optimizations.
 - Browser codec support/autoplay policy governs video. Source file cap 100 MiB; legacy ZIP imports cap 110 MiB compressed, 200 MiB expanded, 32 entries. New `.ascii` gzip JSON export is not source-size bounded after compression.
+- The terminal player uses a monotonic wall clock with the external FFplay process; audio device/startup latency can cause a small initial sync offset. Without FFplay, use `--no-audio`.
 - `@ascii-gpu/vue` is currently a local workspace source package, not yet a standalone publishable package.
 - The image preview stores the original media but handles EXIF/magic-byte validation and unusual color profiles are not yet hardened.
 

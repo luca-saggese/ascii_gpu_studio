@@ -30,6 +30,12 @@ describe('scene and grid', () => {
 
   it('accepts defaults and rejects unsafe grid and charset values', () => {
     expect(validateScene(structuredClone(DEFAULT_SCENE))).toBe(true);
+    expect(
+      validateScene({
+        ...structuredClone(DEFAULT_SCENE),
+        appearance: { ...DEFAULT_SCENE.appearance, mode: 'bw' },
+      }),
+    ).toBe(true);
     expect(() => validateScene({ ...DEFAULT_SCENE, grid: { columns: 2 } })).toThrow(/16 a 320/);
     expect(() => validateScene({ ...DEFAULT_SCENE, typography: { charset: 'x' } })).toThrow(
       /charset/,

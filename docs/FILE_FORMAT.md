@@ -63,9 +63,13 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
 
 An image has exactly one page and no audio. Video pages are complete frames sampled at 100 ms intervals; each frame records its timestamp and display duration. In source-color mode, a page can also store `colors`: Base64-encoded RGB bytes, three bytes per cell in row-major order. This compact binary field is for cell colors only; frame text stays directly in JSON.
 
-New documents record source dimensions, the source-aspect-preserving target rectangle (at most 1024 × 576), final logical content dimensions, complete grid dimensions, integer cell metrics, and the shared font baseline. `width` and `height` are exact multiples of `cellWidth` and `cellHeight`; unused target margins are centered through contain sampling. Older v1 documents without the `source` and `target` fields remain readable. Resizing a preview does not alter the saved grid. MP4 may add at most one technical pixel on the right or bottom to satisfy even encoder dimensions; that padding is not part of the logical `.ascii` content.
+
+Black-and-white rendering uses `render.colors.mode: "bw"` with white foreground and black background. Its pages omit per-cell RGB data and use only the lightest and densest charset glyphs after luminance thresholding.
+
 
 Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. For `.ascii` export, the browser records the source audio track in a supported audio-only container (normally WebM/Opus in Chromium or MP4/AAC in Safari) and embeds those bytes. `offsetMs` is relative to the ASCII frame timeline. HTML playback uses the audio clock when audio is present and a monotonic clock otherwise. MP4 export from a loaded source video demuxes audio directly from the original local file; MP4 export from an imported `.ascii` document decodes its embedded audio. Both paths encode the audio as AAC.
+
+`tools/play_ascii.py` reads this gzip-JSON format directly. It schedules frames against their `timestampMs` values, uses embedded `durationMs` for the final frame, honors audio `offsetMs`, and delegates embedded audio playback to the local FFplay executable. FFplay/device output latency can cause a small initial sync offset; if FFplay is unavailable, use `--no-audio` to play the frames silently.
 
 The serialization and validation boundary lives in `src/ascii-document.js`; image/video frame capture is in `src/ascii-export.js`. Full-frame pages are used in v1 so a future version can introduce delta frames or chunk compression behind the same reader/player boundary.
 

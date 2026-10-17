@@ -4,7 +4,9 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
+
 The single export menu and gzip JSON ASCII document are implemented. It includes deterministic 100 ms video seeking, optional source-audio capture, worker-rendered PNG, a self-contained offline HTML player, and deterministic H.264/AAC MP4 encoding/muxing through Mediabunny. MP4 from a loaded source video demuxes audio directly from the original file; imported `.ascii` projects use embedded audio. The current shared-layout branch passes lint, 16 unit tests, build, format check, and all 17 Chromium E2E tests. Browser coverage includes horizontal, vertical, square, resize, vector/bitmap parity, PNG/ASCII/HTML dimensions, HTML fullscreen contain behavior, MP4 audio, and silent MP4. Safari has not yet been tested in the browser matrix. Edge Detection and Flatten Colors are integrated into capture/export. Optional vector glyph rendering parses bundled OFL 1.1 WOFF font outlines; Canvas `Path2D` even-odd fills preserve counters without glyph atlases. Vector paths are cached and stored once per used character in `.ascii`; preview, PNG, and offline HTML use the same geometry. Bitmap is still the default. The browser suite also simulates an unavailable WebGL2 context and verifies bitmap Canvas 2D fallback. `.ascii` export proceeds without audio when capture is unsupported/fails, and the fallback is announced. The cumulative 20-million-cell cap was removed; video duration and memory/document-byte constraints remain.
+
 
 The Studio also has **Save defaults**: it persists the full validated scene in browser localStorage; startup and Reset settings apply the saved values. The E2E checks saving, resetting, and reload persistence.
 
@@ -13,6 +15,10 @@ Bitmap preview prefers WebGL2. If browser policy, hardware, or configuration pre
 Video `.ascii` export's 40% phase is real-time audio capture; after it completes, frames are deterministically sought and converted at 100 ms intervals. The CPU export path now precomputes edge-filter luminance/blur instead of recalculating each neighborhood repeatedly and avoids temporary neighbor arrays in the bilateral filter. Longer clips, many frames, high columns, or active filters can still take time and consume memory; no sampling or cell-count cap has been reintroduced.
 
 Flatten Colors uses bilateral smoothing and an OKLab nearest-color palette without dithering. Images derive a palette from the source; videos sample six distributed timestamps once and reuse the palette for all frames. WebGL preview uses a shared palette texture; ASCII capture stores final palette-only cell RGB and `.ascii` carries the palette/settings metadata. Combined edge detection always samples original luminance while using flattened colors as its image base.
+
+Appearance has a dedicated strict B/W mode in addition to monochrome and source RGB. It thresholds luminance to the charset's lightest/densest glyphs, fixes ink/background to white/black, and emits only binary pixels with no per-cell RGB field. Chromium E2E verifies WebGL and vector previews plus `.ascii` metadata.
+
+`tools/play_ascii.py` is a standard-library Python 3 player for gzip JSON `.ascii` documents. It centers/crops frames to the terminal, schedules by document timestamps and drops late frames to avoid cumulative delay; `--fps` caps redraws. Embedded audio plays through external FFplay, with an acknowledged small startup/device latency limitation. Run its unit tests with `python3 -m unittest discover -s tools -p 'test_*.py'`.
 
 The inspector is viewport-bounded, scrolls independently from the page, and keeps its header/footer outside the scroll area. All five settings groups use native collapsible details/summary; edge mode is a select menu.
 
@@ -44,6 +50,7 @@ pnpm test:e2e
 - Source audio is native video playback only; never audio-reactive.
 - ZIP v1 limits: 32 entries, 110 MiB compressed, 200 MiB expanded; media source cap 100 MiB.
 - No third-party fonts or remote Google Fonts. The synthetic video fixture is project-generated VP8/Opus.
+- The terminal player needs no Python packages; FFplay from an FFmpeg installation is required for embedded audio.
 
 ## Current gaps
 

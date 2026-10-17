@@ -1,3 +1,4 @@
+import { getAppearanceColors } from './core.js';
 import { serializeAsciiDocument } from './ascii-document.js';
 
 const FRAME_INTERVAL_MS = 100;
@@ -214,8 +215,7 @@ function createDocument({ kind, scene, firstPage, audio }) {
         : {}),
       colors: {
         mode: scene.appearance.mode,
-        foreground: scene.appearance.foreground,
-        background: scene.appearance.background,
+        ...getAppearanceColors(scene.appearance),
       },
       fit: 'contain',
     },

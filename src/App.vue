@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { DEFAULT_SCENE, fontFamilyFor, validateScene } from './core.js';
+import { DEFAULT_SCENE, fontFamilyFor, getAppearanceColors, validateScene } from './core.js';
 import { createAsciiRenderer } from './renderer.js';
 import { loadOutlineFonts } from './glyph-geometry.js';
 import { readAscii } from './format.js';
@@ -55,8 +55,7 @@ function renderCurrentFrame() {
       },
       colors: {
         mode: scene.value.appearance.mode,
-        foreground: scene.value.appearance.foreground,
-        background: scene.value.appearance.background,
+        ...getAppearanceColors(scene.value.appearance),
       },
       mode: 'vector',
       unitsPerEm: capture.unitsPerEm,
@@ -114,6 +113,7 @@ const exportMenu = ref(null);
 const exportButton = ref(null);
 const video = ref(null);
 const scene = ref(getInitialScene());
+const appearanceColors = computed(() => getAppearanceColors(scene.value.appearance));
 const mediaFile = ref(null);
 const mediaName = ref('');
 const mediaKind = ref('');
@@ -806,21 +806,37 @@ function onKeydown(event) {
               >
                 Source color
               </button>
+              <button
+                :class="{ selected: scene.appearance.mode === 'bw' }"
+                aria-label="Black and white"
+                title="Render only black and white"
+                @click="scene.appearance.mode = 'bw'"
+              >
+                B/W
+              </button>
             </div>
             <div class="color-row">
               <label for="foreground">Ink color</label>
               <div class="color-control">
-                <input id="foreground" v-model="scene.appearance.foreground" type="color" /><code>{{
-                  scene.appearance.foreground.toUpperCase()
-                }}</code>
+                <input
+                  id="foreground"
+                  :value="appearanceColors.foreground"
+                  :disabled="scene.appearance.mode === 'bw'"
+                  type="color"
+                  @input="scene.appearance.foreground = $event.target.value"
+                /><code>{{ appearanceColors.foreground.toUpperCase() }}</code>
               </div>
             </div>
             <div class="color-row">
               <label for="background">Canvas</label>
               <div class="color-control">
-                <input id="background" v-model="scene.appearance.background" type="color" /><code>{{
-                  scene.appearance.background.toUpperCase()
-                }}</code>
+                <input
+                  id="background"
+                  :value="appearanceColors.background"
+                  :disabled="scene.appearance.mode === 'bw'"
+                  type="color"
+                  @input="scene.appearance.background = $event.target.value"
+                /><code>{{ appearanceColors.background.toUpperCase() }}</code>
               </div>
             </div>
             <label class="field-label" for="contrast"

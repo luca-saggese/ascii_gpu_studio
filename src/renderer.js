@@ -2,6 +2,9 @@ import {
   coverageOrder,
   DEFAULT_SCENE,
   fontFamilyFor,
+
+  getAppearanceColors,
+  gridForSource,
   calculateContentLayout,
   validateScene,
 } from './core.js';
@@ -37,6 +40,7 @@ uniform float contrast;
 uniform float gammaValue;
 uniform float invertValue;
 uniform float rgbMode;
+uniform float bwMode;
 uniform float edgeEnabled;
 uniform float edgeThreshold;
 uniform float edgeSmoothing;
@@ -153,13 +157,15 @@ void main(){
   float value=clamp((luminance-.5)*contrast+.5+brightness,0.,1.);
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
-  float glyphIndex=inside ? floor((1.-value)*(glyphCount-1.)+.5) : 0.;
+
+  float glyphIndex=bwMode>.5 ? (value<.5 ? glyphCount-1. : 0.) : floor((1.-value)*(glyphCount-1.)+.5);
   vec2 tilePixels=tileSize*atlasScale;
   vec2 atlasUv=vec2(
     (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
     (.5+inCell.y*(tilePixels.y-1.))/tilePixels.y
   );
   float mask=texture(atlasTex,atlasUv).r;
+  if(bwMode>.5) mask=step(.5,mask);
   vec3 ink=rgbMode>.5 ? avg : foreground;
   color=vec4(mix(background,ink,mask),1.);
 }`;
@@ -235,6 +241,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         'gammaValue',
         'invertValue',
         'rgbMode',
+        'bwMode',
         'edgeEnabled',
         'edgeThreshold',
         'edgeSmoothing',
@@ -427,8 +434,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         },
         colors: {
           mode: currentScene.appearance.mode,
-          foreground: currentScene.appearance.foreground,
-          background: currentScene.appearance.background,
+          ...getAppearanceColors(currentScene.appearance),
         },
         mode: 'bitmap',
       });
@@ -499,6 +505,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('gammaValue', currentScene.appearance.gamma);
     setUniforms('invertValue', currentScene.appearance.invert ? 1 : 0);
     setUniforms('rgbMode', currentScene.appearance.mode === 'rgb' ? 1 : 0);
+    setUniforms('bwMode', currentScene.appearance.mode === 'bw' ? 1 : 0);
     currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
     currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
     setUniforms('edgeEnabled', currentScene.edgeDetection.enabled ? 1 : 0);
@@ -509,8 +516,19 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('flattenEnabled', currentScene.flattenColors.enabled ? 1 : 0);
     setUniforms('flattenSmoothing', currentScene.flattenColors.smoothing);
     setUniforms('paletteCount', palette.length);
+
+    const appearanceColors = getAppearanceColors(currentScene.appearance);
     setUniforms('foreground', ...color(currentScene.appearance.foreground));
     setUniforms('background', ...color(currentScene.appearance.background));
+    setUniforms(
+      'fitMode',
+      currentScene.appearance.fit === 'cover'
+        ? 1
+        : currentScene.appearance.fit === 'stretch'
+          ? 2
+          : 0,
+    );
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     canvas.dataset.columns = String(layout.columns);
     canvas.dataset.rows = String(layout.rows);
@@ -619,6 +637,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         );
         luminance = Math.pow(luminance, 1 / Math.max(currentScene.appearance.gamma, 0.05));
         if (currentScene.appearance.invert) luminance = 1 - luminance;
+        if (currentScene.appearance.mode === 'bw') luminance = luminance < 0.5 ? 0 : 1;
         const density = 1 - luminance;
         const glyphIndex = Math.round(density * (glyphs.length - 1));
         text += alpha < 0.05 ? ' ' : glyphs[glyphIndex];
