@@ -246,6 +246,36 @@ test('imports an image, renders through WebGL2, and exports the source project',
   await offlinePage.close();
 });
 
+test('keeps the image preview working when WebGL2 context creation is unavailable', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (type === 'webgl2') return null;
+      return getContext.call(this, type, ...args);
+    };
+  });
+  await page.goto('/');
+  const svg = await readFile(new URL('../../tests/fixtures/studio-sample.svg', import.meta.url));
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'studio-sample.svg',
+    mimeType: 'image/svg+xml',
+    buffer: svg,
+  });
+
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  await expect(canvas).toHaveAttribute('data-columns', '96');
+  await expect(page.locator('.render-badge')).toContainText('Canvas2D fallback');
+  await expect(page.locator('.toast')).toContainText('anteprima attiva con Canvas 2D');
+  const rendered = await canvas.evaluate((element) => {
+    const context = element.getContext('2d');
+    const { data } = context.getImageData(0, 0, element.width, element.height);
+    return data.some((channel, index) => index % 4 !== 3 && channel !== 0);
+  });
+  expect(rendered).toBe(true);
+});
+
 test('renders and exports OpenType vector glyph outlines offline', async ({ page }, testInfo) => {
   await page.goto('/');
   const outlineChecks = await page.evaluate(async () => {

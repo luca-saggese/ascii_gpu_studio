@@ -2,16 +2,17 @@
 
 Current milestone: M6 — release hardening, **partial implementation; not release-ready**
 
-Latest committed implementation: `24a0ecc` (`fix(export): allow large ASCII exports and optional audio`); vector-rendering work is in the current working tree and has not been committed.
+Latest committed implementation: `691d2b2` (`feat(renderer): add offline vector glyph rendering`); WebGL2 fallback work is in the current working tree and has not been committed.
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification after vector rendering: `pnpm lint`, `pnpm test` (14 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (14 Chromium tests) all pass. Video ASCII export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification after Canvas 2D fallback: `pnpm lint`, `pnpm test` (14 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (15 Chromium tests) all pass. The new browser regression simulates WebGL2 context creation failure and confirms that the image preview still renders through Canvas 2D. Video ASCII export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
 - Real WebGL2 fragment shader with measured glyph atlas, adjustable columns/charset/color/fit/brightness/contrast/invert controls, and PNG capture. Font size is fixed internally rather than exposed as a separate setting.
+- If WebGL2 context creation is unavailable, the bitmap preview falls back to Canvas 2D and reports the active backend; vector preview continues through its existing Canvas 2D path. WebGL2 remains the preferred renderer.
 - Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
@@ -36,14 +37,14 @@ Latest verification after vector rendering: `pnpm lint`, `pnpm test` (14 tests),
 - Temporal hysteresis, custom charset text entry, editing/history/undo, presets, custom font uploads, TXT/SVG export.
 - Deterministic MP4 export awaits WebCodecs plus a verified muxer. HTML player fonts use the installed local monospace family rather than embedding a font file.
 - Exported video audio is captured to WebM/Opus via `captureStream` and MediaRecorder; browser support varies, and unsupported capture/codec paths return explicit errors. Native Studio playback continues using the original video audio track.
-- React/Web Component packages, external Vue consumer install/publish, Canvas2D fallback, WebGL context restoration.
+- React/Web Component packages, external Vue consumer install/publish, WebGL context restoration.
 - CI/browser matrix, screen-reader audit, quantitative performance/memory benchmarks, and hand-reviewed screenshots on other operating systems.
 - `.ascii` hard limits prevent oversized extraction, but the implementation still holds extracted file bytes in memory; archives are local, not streamed from remote storage.
 - Expanded-size enforcement is implemented during decompression, but there is not yet a dedicated ZIP-bomb regression fixture that drives the 200 MiB cap.
 
 ## Known limits
 
-- WebGL2 is required; unavailable contexts show an error and do not fall back.
+- Canvas 2D fallback preserves the preview when WebGL2 is unavailable, but CPU conversion can be slower, especially for video and high column counts. WebGL2 remains recommended for performance.
 - Browser codec support/autoplay policy governs video. Source file cap 100 MiB; legacy ZIP imports cap 110 MiB compressed, 200 MiB expanded, 32 entries. New `.ascii` gzip JSON export is not source-size bounded after compression.
 - `@ascii-gpu/vue` is currently a local workspace source package, not yet a standalone publishable package.
 - The image preview stores the original media but handles EXIF/magic-byte validation and unusual color profiles are not yet hardened.

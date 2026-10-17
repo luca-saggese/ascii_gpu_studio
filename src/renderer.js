@@ -14,6 +14,7 @@ import {
   paletteAsHex,
   sampleSourceColors,
 } from './flatten-colors.js';
+import { renderAsciiPage } from './ascii-render.js';
 
 const vertex = `#version 300 es
 in vec2 position;
@@ -171,62 +172,83 @@ function compile(gl, type, source) {
 }
 
 export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats = () => {} }) {
-  const gl = canvas.getContext('webgl2', {
-    alpha: false,
-    antialias: false,
-    preserveDrawingBuffer: true,
-  });
-  if (!gl) throw new Error('WebGL2 non disponibile in questo browser.');
-  const program = gl.createProgram();
-  gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vertex));
-  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragment));
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-    throw new Error(gl.getProgramInfoLog(program) || 'Program linking failed');
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-    gl.STATIC_DRAW,
-  );
-  const position = gl.getAttribLocation(program, 'position');
-  gl.enableVertexAttribArray(position);
-  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-  const sourceTex = gl.createTexture();
-  let atlasTex = gl.createTexture();
-  const paletteTex = gl.createTexture();
-  const locations = Object.fromEntries(
-    [
-      'sourceTex',
-      'atlasTex',
-      'sourceSize',
-      'outputSize',
-      'gridSize',
-      'tileSize',
-      'atlasScale',
-      'glyphCount',
-      'brightness',
-      'contrast',
-      'gammaValue',
-      'invertValue',
-      'rgbMode',
-      'edgeEnabled',
-      'edgeThreshold',
-      'edgeSmoothing',
-      'edgeMode',
-      'edgeIntensity',
-      'flattenEnabled',
-      'flattenSmoothing',
-      'paletteCount',
-      'foreground',
-      'background',
-      'fitMode',
-      'paletteTex',
-    ].map((name) => [name, gl.getUniformLocation(program, name)]),
-  );
+  let gl = null;
+  let webglError = null;
+  try {
+    gl = canvas.getContext('webgl2', {
+      alpha: false,
+      antialias: false,
+      preserveDrawingBuffer: true,
+    });
+    if (!gl) gl = canvas.getContext('webgl2');
+  } catch (error) {
+    webglError = error;
+  }
+  const fallbackContext = gl ? null : canvas.getContext('2d', { alpha: false });
+  if (!gl && !fallbackContext) {
+    throw new Error(
+      `WebGL2 non disponibile e Canvas 2D non supportato.${webglError ? ` ${webglError.message}` : ''}`,
+    );
+  }
+  let program = null;
+  let vao = null;
+  let buffer = null;
+  let sourceTex = null;
+  let atlasTex = null;
+  let paletteTex = null;
+  let locations = {};
+  if (gl) {
+    program = gl.createProgram();
+    gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vertex));
+    gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fragment));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw new Error(gl.getProgramInfoLog(program) || 'Program linking failed');
+    vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+    const position = gl.getAttribLocation(program, 'position');
+    gl.enableVertexAttribArray(position);
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+    sourceTex = gl.createTexture();
+    atlasTex = gl.createTexture();
+    paletteTex = gl.createTexture();
+    locations = Object.fromEntries(
+      [
+        'sourceTex',
+        'atlasTex',
+        'sourceSize',
+        'outputSize',
+        'gridSize',
+        'tileSize',
+        'atlasScale',
+        'glyphCount',
+        'brightness',
+        'contrast',
+        'gammaValue',
+        'invertValue',
+        'rgbMode',
+        'edgeEnabled',
+        'edgeThreshold',
+        'edgeSmoothing',
+        'edgeMode',
+        'edgeIntensity',
+        'flattenEnabled',
+        'flattenSmoothing',
+        'paletteCount',
+        'foreground',
+        'background',
+        'fitMode',
+        'paletteTex',
+      ].map((name) => [name, gl.getUniformLocation(program, name)]),
+    );
+  }
   let source = null;
   const cloneScene = (value) => JSON.parse(JSON.stringify(value));
   let currentScene = cloneScene(scene);
@@ -245,7 +267,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let atlasScale = 1;
   const fontSize = 20;
   const targetAtlasScale = Math.min((window.devicePixelRatio || 1) * 4, 8);
-  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const maxTextureSize = gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 8192;
+  const backend = gl ? 'WebGL2' : 'Canvas2D fallback';
   const color = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const setUniforms = (name, ...values) =>
     gl[values.length === 1 ? 'uniform1f' : values.length === 2 ? 'uniform2f' : 'uniform3f'](
@@ -259,7 +282,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       currentScene.flattenColors.colorCount,
       currentScene.flattenColors.smoothing,
     );
-    if (!palette.length) return;
+    if (!palette.length || !gl) return;
     const pixels = new Uint8Array(64 * 4);
     for (let index = 0; index < 64; index += 1) {
       const color = palette[Math.min(index, palette.length - 1)];
@@ -304,8 +327,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     tile.descent = descent;
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
-    if (currentScene.rendering?.mode === 'vector') {
-      if (atlasTex) gl.deleteTexture(atlasTex);
+    if (currentScene.rendering?.mode === 'vector' || !gl) {
+      if (atlasTex && gl) gl.deleteTexture(atlasTex);
       atlasTex = null;
       atlas = { count: chars.length, chars };
       return;
@@ -349,6 +372,54 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     if (currentScene.rendering?.mode === 'vector') return;
     if (disposed || !source || (!source.videoWidth && !source.naturalWidth && !source.width))
       return;
+    if (!gl) {
+      const capture = captureText();
+      const width = capture.columns * capture.cellWidth;
+      const height = capture.rows * capture.cellHeight;
+      renderAsciiPage(fallbackContext, capture, {
+        columns: capture.columns,
+        rows: capture.rows,
+        cellWidth: capture.cellWidth,
+        cellHeight: capture.cellHeight,
+        width,
+        height,
+        font: {
+          family: fontFamilyFor(currentScene.typography.fontFamily),
+          size: capture.fontSize,
+          weight: currentScene.typography.fontWeight,
+          ascent: capture.ascent,
+          descent: capture.descent,
+        },
+        colors: {
+          mode: currentScene.appearance.mode,
+          foreground: currentScene.appearance.foreground,
+          background: currentScene.appearance.background,
+        },
+        mode: 'bitmap',
+      });
+      canvas.dataset.columns = String(capture.columns);
+      canvas.dataset.rows = String(capture.rows);
+      canvas.dataset.outputWidth = String(width);
+      canvas.dataset.outputHeight = String(height);
+      canvas.dataset.renderWidth = String(width);
+      canvas.dataset.renderHeight = String(height);
+      if (lastStats !== `${width}x${height}`) {
+        lastStats = `${width}x${height}`;
+        onStats({
+          columns: capture.columns,
+          rows: capture.rows,
+          outputWidth: width,
+          outputHeight: height,
+          renderWidth: width,
+          renderHeight: height,
+          renderScale: 1,
+          cellWidth: capture.cellWidth,
+          cellHeight: capture.cellHeight,
+          backend,
+        });
+      }
+      return;
+    }
     const width = source.videoWidth || source.naturalWidth || source.width;
     const height = source.videoHeight || source.naturalHeight || source.height;
     const grid = gridForSource(width, height, currentScene.grid.columns, tile.width / tile.height);
@@ -442,7 +513,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         renderScale,
         cellWidth: tile.width,
         cellHeight: tile.height,
-        backend: 'WebGL2',
+        backend,
       });
     }
   }
@@ -616,7 +687,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     getStats: () => ({
       columns: Number(canvas.dataset.columns) || 0,
       rows: Number(canvas.dataset.rows) || 0,
-      backend: 'WebGL2',
+      backend,
     }),
     capturePng: () =>
       new Promise((resolve, reject) =>
@@ -627,12 +698,14 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       ),
     dispose() {
       disposed = true;
-      gl.deleteTexture(sourceTex);
-      if (atlasTex) gl.deleteTexture(atlasTex);
-      gl.deleteTexture(paletteTex);
-      gl.deleteBuffer(buffer);
-      gl.deleteVertexArray(vao);
-      gl.deleteProgram(program);
+      if (gl) {
+        gl.deleteTexture(sourceTex);
+        if (atlasTex) gl.deleteTexture(atlasTex);
+        gl.deleteTexture(paletteTex);
+        gl.deleteBuffer(buffer);
+        gl.deleteVertexArray(vao);
+        gl.deleteProgram(program);
+      }
     },
   };
 }

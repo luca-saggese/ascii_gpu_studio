@@ -152,6 +152,9 @@ async function initializeRenderer() {
         statsLabel.value = value;
       },
     });
+    if (renderer.value.getStats().backend === 'Canvas2D fallback') {
+      notify('WebGL2 non disponibile: anteprima attiva con Canvas 2D.');
+    }
     renderCurrentFrame();
     observer = new ResizeObserver(() => renderer.value?.resize());
     observer.observe(canvas.value.parentElement);
@@ -895,7 +898,16 @@ function onKeydown(event) {
               <button :class="{ selected: !asciiMode }" @click="asciiMode = false">GPU</button>
               <button :class="{ selected: asciiMode }" @click="asciiMode = true">ASCII text</button>
             </div>
-            <span class="render-badge"><i /> {{ asciiMode ? 'TEXT' : 'WebGL2' }}</span>
+            <span class="render-badge"
+              ><i />
+              {{
+                asciiMode
+                  ? 'TEXT'
+                  : scene.rendering.mode === 'vector'
+                    ? 'VECTOR'
+                    : statsLabel.backend
+              }}</span
+            >
           </div>
         </div>
         <div class="stage-wrap" @dragover.prevent @drop.prevent="dropFile">
