@@ -2,9 +2,7 @@ import {
   coverageOrder,
   DEFAULT_SCENE,
   fontFamilyFor,
-
   getAppearanceColors,
-  gridForSource,
   calculateContentLayout,
   validateScene,
 } from './core.js';
