@@ -24,7 +24,11 @@ export function renderAsciiPage(context, page, render) {
   const vectorBatches = new Map();
   for (let y = 0; y < rows; y += 1) {
     const line = Array.from(lines[y] || '');
-    const baseline = y * cellHeight + (cellHeight + font.ascent - font.descent) / 2;
+    const baseline =
+      y * cellHeight +
+      (Number.isFinite(font.baseline)
+        ? font.baseline
+        : (cellHeight + font.ascent - font.descent) / 2);
     for (let x = 0; x < columns; x += 1) {
       const glyph = line[x] || ' ';
       if (mode === 'rgb' && colors) {

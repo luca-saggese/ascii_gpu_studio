@@ -2,18 +2,19 @@
 
 Current milestone: M6 — release hardening, **partial implementation; not release-ready**
 
-Latest committed implementation: `691d2b2` (`feat(renderer): add offline vector glyph rendering`); WebGL2 fallback work is in the current working tree and has not been committed.
+Latest committed implementation: `240ddb2` (`fix(export): mux source video audio into MP4`). Shared logical-layout work is in the current working tree.
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification after MP4 source-audio demux: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (16 Chromium tests) all pass. Browser regressions cover unavailable WebGL2 fallback, optimized filter output, MP4 with AAC demuxed from the original video, and silent MP4. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification after shared content-layout work: `pnpm lint`, `pnpm test` (16 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (17 Chromium tests) all pass. Browser regressions cover horizontal/vertical/square sources, identical bitmap/vector logical dimensions, responsive resize, PNG and offline fullscreen dimensions/contain, MP4 source audio, and silent MP4. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
-- Real WebGL2 fragment shader with measured glyph atlas, adjustable columns/charset/color/fit/brightness/contrast/invert controls, and PNG capture. Font size is fixed internally rather than exposed as a separate setting.
+- Real WebGL2 fragment shader with measured glyph atlas, adjustable font size, line height, charset/color/brightness/contrast/invert controls, and PNG capture.
 - If WebGL2 context creation is unavailable, the bitmap preview falls back to Canvas 2D and reports the active backend; vector preview continues through its existing Canvas 2D path. WebGL2 remains the preferred renderer.
-- Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
+- One shared source layout measures integer font cells, fits complete rows/columns into 1024×576 while preserving source aspect, and drives WebGL, vector, fallback, ASCII capture, PNG, MP4, and HTML. Resize changes only display scale; logical dimensions and exports remain fixed. MP4 adds even-dimension padding only on the right/bottom.
+- Toggle between WebGL output and normal monospace ASCII text. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit; DPR affects only preview buffer resolution.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
 - Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
@@ -26,7 +27,7 @@ Latest verification after MP4 source-audio demux: `pnpm lint`, `pnpm test` (15 t
 - CPU export filtering avoids repeated Sobel neighborhood calculations and per-neighbor allocation in bilateral smoothing; unit tests compare optimized edge output to the reference magnitude.
 - A single keyboard-accessible Export dropdown offers ASCII, contextual PNG/MP4, and standalone offline HTML. It supports Escape/outside click and reports cancellable progress for video conversion.
 - PNG rasterizes the ASCII document at configured cell resolution in an OffscreenCanvas worker when available; the same drawing function is embedded in the offline HTML player.
-- Optional vector glyph rendering uses parsed OpenType outlines and even-odd `Path2D` fills, cached by font/weight/glyph/precision. Bitmap remains the default. IBM Plex Mono, Cousine, and Lora are bundled under SIL OFL 1.1 and shared by both renderer modes. The vector `.ascii` mode stores deduplicated outline geometry only for glyphs present in captured pages plus font license attribution; PNG and offline HTML use those same paths without a font or raster atlas.
+- Optional vector glyph rendering uses parsed OpenType outlines and even-odd `Path2D` fills, cached by font/weight/glyph/precision. Bitmap remains the default. IBM Plex Mono and Cousine are the selectable monospaced families; bundled Lora assets remain available for existing vector documents. The vector `.ascii` mode stores deduplicated outline geometry only for glyphs present in captured pages plus font license attribution; PNG and offline HTML use those same paths without a font or raster atlas.
 - Vector preview uses Canvas 2D path rasterization rather than WebGL; large grids and video can therefore be slower than bitmap preview.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.

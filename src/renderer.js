@@ -2,7 +2,7 @@ import {
   coverageOrder,
   DEFAULT_SCENE,
   fontFamilyFor,
-  gridForSource,
+  calculateContentLayout,
   validateScene,
 } from './core.js';
 import { vectorGlyphs } from './glyph-geometry.js';
@@ -28,7 +28,6 @@ out vec4 color;
 uniform sampler2D sourceTex;
 uniform sampler2D atlasTex;
 uniform vec2 sourceSize;
-uniform vec2 outputSize;
 uniform vec2 gridSize;
 uniform vec2 tileSize;
 uniform float atlasScale;
@@ -48,7 +47,6 @@ uniform float flattenSmoothing;
 uniform float paletteCount;
 uniform vec3 foreground;
 uniform vec3 background;
-uniform float fitMode;
 uniform sampler2D paletteTex;
 float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
 vec3 linearRgb(vec3 c){
@@ -132,18 +130,22 @@ void main(){
   vec2 inCell=fract(uv*gridSize);
   vec2 sourceAspect=vec2(sourceSize.x/sourceSize.y,1.);
   vec2 frameAspect=vec2(gridSize.x*tileSize.x/(gridSize.y*tileSize.y),1.);
-  vec2 scale=fitMode<.5 ? min(frameAspect/sourceAspect,vec2(1.)) : max(frameAspect/sourceAspect,vec2(1.));
+  vec2 scale=min(frameAspect/sourceAspect,vec2(1.));
   vec2 sampleUv=(cell+.5)/gridSize;
-  sampleUv=fitMode>1.5 ? sampleUv : (sampleUv-.5)/scale+.5;
-  vec3 avg=vec3(0.);
-  for(int y=0;y<3;y++) for(int x=0;x<3;x++){
-    vec2 offset=(vec2(float(x),float(y))-1.)/gridSize/3.;
-    avg+=texture(sourceTex,clamp(sampleUv+offset,vec2(0.),vec2(1.))).rgb/9.;
+  sampleUv=(sampleUv-.5)/scale+.5;
+  bool inside=all(greaterThanEqual(sampleUv,vec2(0.)))&&all(lessThanEqual(sampleUv,vec2(1.)));
+  vec3 avg=background;
+  if(inside){
+    avg=vec3(0.);
+    for(int y=0;y<3;y++) for(int x=0;x<3;x++){
+      vec2 offset=(vec2(float(x),float(y))-1.)/gridSize/3.;
+      avg+=texture(sourceTex,clamp(sampleUv+offset,vec2(0.),vec2(1.))).rgb/9.;
+    }
   }
   vec2 sampleStep=1./gridSize/scale;
-  if(flattenEnabled>.5&&paletteCount>0.) avg=flattenColor(avg,sampleUv,sampleStep);
+  if(inside&&flattenEnabled>.5&&paletteCount>0.) avg=flattenColor(avg,sampleUv,sampleStep);
   float luminance=lum(avg);
-  if(edgeEnabled>.5){
+  if(inside&&edgeEnabled>.5){
     float edge=edgeMagnitude(sampleUv,1./gridSize/scale);
     edge=edge>=edgeThreshold ? edge : 0.;
     luminance=edgeMode<.5 ? 1.-edge : luminance*(1.-edge*edgeIntensity);
@@ -151,7 +153,7 @@ void main(){
   float value=clamp((luminance-.5)*contrast+.5+brightness,0.,1.);
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
-  float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
+  float glyphIndex=inside ? floor((1.-value)*(glyphCount-1.)+.5) : 0.;
   vec2 tilePixels=tileSize*atlasScale;
   vec2 atlasUv=vec2(
     (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
@@ -224,7 +226,6 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         'sourceTex',
         'atlasTex',
         'sourceSize',
-        'outputSize',
         'gridSize',
         'tileSize',
         'atlasScale',
@@ -244,7 +245,6 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         'paletteCount',
         'foreground',
         'background',
-        'fitMode',
         'paletteTex',
       ].map((name) => [name, gl.getUniformLocation(program, name)]),
     );
@@ -252,9 +252,14 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let source = null;
   const cloneScene = (value) => JSON.parse(JSON.stringify(value));
   let currentScene = cloneScene(scene);
+  currentScene.typography.fontFamily = fontFamilyFor(currentScene.typography.fontFamily);
   currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
   currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
   currentScene.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
+  currentScene.typography.lineHeight ??= 1.3;
+  currentScene.appearance.fit = 'contain';
+  currentScene.typography.lineHeight ??= 1.3;
+  currentScene.appearance.fit = 'contain';
   let atlas = null;
   let disposed = false;
   let lastStats = '';
@@ -264,8 +269,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let palettePromise = null;
   let sourceGeneration = 0;
   const tile = { width: 1, height: 1 };
+  let layout = null;
   let atlasScale = 1;
-  const fontSize = 20;
   const targetAtlasScale = Math.min((window.devicePixelRatio || 1) * 4, 8);
   const maxTextureSize = gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 8192;
   const backend = gl ? 'WebGL2' : 'Canvas2D fallback';
@@ -303,7 +308,24 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     renderFrame();
   }
 
+  function updateLayout() {
+    const width = source?.videoWidth || source?.naturalWidth || source?.width;
+    const height = source?.videoHeight || source?.naturalHeight || source?.height;
+    if (!width || !height) {
+      layout = null;
+      return;
+    }
+    layout = calculateContentLayout(
+      width,
+      height,
+      tile.width,
+      tile.height,
+      currentScene.grid.maxCells ?? 40000,
+    );
+  }
+
   function makeAtlas() {
+    const fontSize = currentScene.typography.fontSize;
     const fontFamily = fontFamilyFor(currentScene.typography.fontFamily);
     const chars = coverageOrder(
       currentScene.typography.charset,
@@ -316,7 +338,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const measurementContext = measurementCanvas.getContext('2d');
     measurementContext.font = font;
     const metrics = chars.map((char) => measurementContext.measureText(char));
-    const maxAdvance = Math.max(...metrics.map((metric) => metric.width));
+    const advance = measurementContext.measureText('M').width;
     const ascent = Math.max(
       ...metrics.map((metric) => metric.actualBoundingBoxAscent || fontSize * 0.8),
     );
@@ -325,8 +347,12 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     );
     tile.ascent = ascent;
     tile.descent = descent;
-    tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
-    tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
+    tile.width = Math.max(1, Math.ceil(advance));
+    tile.height = Math.max(
+      Math.ceil(ascent + descent),
+      Math.round(fontSize * currentScene.typography.lineHeight),
+    );
+    updateLayout();
     if (currentScene.rendering?.mode === 'vector' || !gl) {
       if (atlasTex && gl) gl.deleteTexture(atlasTex);
       atlasTex = null;
@@ -369,26 +395,35 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   }
 
   function renderFrame() {
-    if (currentScene.rendering?.mode === 'vector') return;
+    if (currentScene.rendering?.mode === 'vector') {
+      if (layout) {
+        canvas.dataset.columns = String(layout.columns);
+        canvas.dataset.rows = String(layout.rows);
+        canvas.dataset.outputWidth = String(layout.outputWidth);
+        canvas.dataset.outputHeight = String(layout.outputHeight);
+      }
+      return;
+    }
     if (disposed || !source || (!source.videoWidth && !source.naturalWidth && !source.width))
       return;
+    if (!layout) updateLayout();
+    if (!layout) return;
     if (!gl) {
       const capture = captureText();
-      const width = capture.columns * capture.cellWidth;
-      const height = capture.rows * capture.cellHeight;
       renderAsciiPage(fallbackContext, capture, {
         columns: capture.columns,
         rows: capture.rows,
         cellWidth: capture.cellWidth,
         cellHeight: capture.cellHeight,
-        width,
-        height,
+        width: capture.outputWidth,
+        height: capture.outputHeight,
         font: {
           family: fontFamilyFor(currentScene.typography.fontFamily),
           size: capture.fontSize,
           weight: currentScene.typography.fontWeight,
           ascent: capture.ascent,
           descent: capture.descent,
+          baseline: capture.baseline,
         },
         colors: {
           mode: currentScene.appearance.mode,
@@ -399,19 +434,23 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       });
       canvas.dataset.columns = String(capture.columns);
       canvas.dataset.rows = String(capture.rows);
-      canvas.dataset.outputWidth = String(width);
-      canvas.dataset.outputHeight = String(height);
-      canvas.dataset.renderWidth = String(width);
-      canvas.dataset.renderHeight = String(height);
-      if (lastStats !== `${width}x${height}`) {
-        lastStats = `${width}x${height}`;
+      canvas.dataset.outputWidth = String(capture.outputWidth);
+      canvas.dataset.outputHeight = String(capture.outputHeight);
+      canvas.dataset.cellWidth = String(capture.cellWidth);
+      canvas.dataset.cellHeight = String(capture.cellHeight);
+      canvas.dataset.sourceWidth = String(capture.sourceWidth);
+      canvas.dataset.sourceHeight = String(capture.sourceHeight);
+      canvas.dataset.renderWidth = String(capture.outputWidth);
+      canvas.dataset.renderHeight = String(capture.outputHeight);
+      if (lastStats !== `${capture.outputWidth}x${capture.outputHeight}`) {
+        lastStats = `${capture.outputWidth}x${capture.outputHeight}`;
         onStats({
           columns: capture.columns,
           rows: capture.rows,
-          outputWidth: width,
-          outputHeight: height,
-          renderWidth: width,
-          renderHeight: height,
+          outputWidth: capture.outputWidth,
+          outputHeight: capture.outputHeight,
+          renderWidth: capture.outputWidth,
+          renderHeight: capture.outputHeight,
           renderScale: 1,
           cellWidth: capture.cellWidth,
           cellHeight: capture.cellHeight,
@@ -422,19 +461,10 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     }
     const width = source.videoWidth || source.naturalWidth || source.width;
     const height = source.videoHeight || source.naturalHeight || source.height;
-    const grid = gridForSource(width, height, currentScene.grid.columns, tile.width / tile.height);
-    grid.rows = Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns));
-    const outWidth = Math.max(1, grid.columns * tile.width * atlasScale);
-    const outHeight = Math.max(1, grid.rows * tile.height * atlasScale);
-    const bounds = canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const renderScale = Math.min(
-      1,
-      (Math.max(1, bounds.width) * dpr) / outWidth,
-      (Math.max(1, bounds.height) * dpr) / outHeight,
-    );
-    canvas.width = Math.max(1, Math.round(outWidth * renderScale));
-    canvas.height = Math.max(1, Math.round(outHeight * renderScale));
+    const renderScale = Math.max(1, Math.floor(dpr));
+    canvas.width = Math.max(1, Math.round(layout.outputWidth * renderScale));
+    canvas.height = Math.max(1, Math.round(layout.outputHeight * renderScale));
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.useProgram(program);
     gl.bindVertexArray(vao);
@@ -460,8 +490,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     gl.bindTexture(gl.TEXTURE_2D, paletteTex);
     gl.uniform1i(locations.paletteTex, 2);
     setUniforms('sourceSize', width, height);
-    setUniforms('outputSize', canvas.width, canvas.height);
-    setUniforms('gridSize', grid.columns, grid.rows);
+    setUniforms('gridSize', layout.columns, layout.rows);
     setUniforms('tileSize', tile.width, tile.height);
     setUniforms('atlasScale', atlasScale);
     setUniforms('glyphCount', atlas.count);
@@ -482,32 +511,28 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('paletteCount', palette.length);
     setUniforms('foreground', ...color(currentScene.appearance.foreground));
     setUniforms('background', ...color(currentScene.appearance.background));
-    setUniforms(
-      'fitMode',
-      currentScene.appearance.fit === 'cover'
-        ? 1
-        : currentScene.appearance.fit === 'stretch'
-          ? 2
-          : 0,
-    );
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-    canvas.dataset.columns = String(grid.columns);
-    canvas.dataset.rows = String(grid.rows);
-    canvas.dataset.outputWidth = String(outWidth);
-    canvas.dataset.outputHeight = String(outHeight);
+    canvas.dataset.columns = String(layout.columns);
+    canvas.dataset.rows = String(layout.rows);
+    canvas.dataset.outputWidth = String(layout.outputWidth);
+    canvas.dataset.outputHeight = String(layout.outputHeight);
+    canvas.dataset.cellWidth = String(layout.cellWidth);
+    canvas.dataset.cellHeight = String(layout.cellHeight);
+    canvas.dataset.sourceWidth = String(layout.sourceWidth);
+    canvas.dataset.sourceHeight = String(layout.sourceHeight);
     canvas.dataset.renderWidth = String(canvas.width);
     canvas.dataset.renderHeight = String(canvas.height);
     canvas.dataset.renderScale = String(renderScale);
     canvas.dataset.atlasScale = String(atlasScale);
     canvas.dataset.paletteSize = String(palette.length);
-    const statsKey = `${grid.columns}x${grid.rows}:${outWidth}x${outHeight}`;
+    const statsKey = `${layout.columns}x${layout.rows}:${layout.outputWidth}x${layout.outputHeight}`;
     if (statsKey !== lastStats) {
       lastStats = statsKey;
       onStats({
-        columns: grid.columns,
-        rows: grid.rows,
-        outputWidth: outWidth,
-        outputHeight: outHeight,
+        columns: layout.columns,
+        rows: layout.rows,
+        outputWidth: layout.outputWidth,
+        outputHeight: layout.outputHeight,
         renderWidth: canvas.width,
         renderHeight: canvas.height,
         renderScale,
@@ -522,13 +547,12 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     if (disposed || !source || (!source.videoWidth && !source.naturalWidth && !source.width)) {
       throw new Error('Carica un’immagine o un video prima di generare il testo ASCII.');
     }
-    const width = source.videoWidth || source.naturalWidth || source.width;
-    const height = source.videoHeight || source.naturalHeight || source.height;
-    const grid = gridForSource(width, height, currentScene.grid.columns, tile.width / tile.height);
-    grid.rows = Math.max(
-      1,
-      Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns)),
-    );
+    if (!layout) updateLayout();
+    if (!layout) throw new Error('Dimensioni della griglia non disponibili.');
+    const grid = layout;
+    const fontSize = currentScene.typography.fontSize;
+    const width = grid.sourceWidth;
+    const height = grid.sourceHeight;
     if (!textCanvas) textCanvas = document.createElement('canvas');
     const sampleScale =
       currentScene.edgeDetection?.enabled || currentScene.flattenColors?.enabled ? 2 : 1;
@@ -537,24 +561,16 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     textCanvas.width = sampleWidth;
     textCanvas.height = sampleHeight;
     const context = textCanvas.getContext('2d', { willReadFrequently: true });
-    const fit = currentScene.appearance.fit;
-    if (fit === 'stretch') {
-      context.drawImage(source, 0, 0, sampleWidth, sampleHeight);
-    } else {
-      const scale =
-        fit === 'cover'
-          ? Math.max(sampleWidth / width, sampleHeight / height)
-          : Math.min(sampleWidth / width, sampleHeight / height);
-      const drawWidth = width * scale;
-      const drawHeight = height * scale;
-      context.drawImage(
-        source,
-        (sampleWidth - drawWidth) / 2,
-        (sampleHeight - drawHeight) / 2,
-        drawWidth,
-        drawHeight,
-      );
-    }
+    const scale = Math.min(sampleWidth / width, sampleHeight / height);
+    const drawWidth = width * scale;
+    const drawHeight = height * scale;
+    context.drawImage(
+      source,
+      (sampleWidth - drawWidth) / 2,
+      (sampleHeight - drawHeight) / 2,
+      drawWidth,
+      drawHeight,
+    );
     const rawPixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
     const pixels = currentScene.flattenColors?.enabled
       ? flattenPixelData(
@@ -615,10 +631,17 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       rows: grid.rows,
       cellWidth: tile.width,
       cellHeight: tile.height,
+      outputWidth: grid.outputWidth,
+      outputHeight: grid.outputHeight,
+      sourceWidth: grid.sourceWidth,
+      sourceHeight: grid.sourceHeight,
+      targetWidth: grid.targetWidth,
+      targetHeight: grid.targetHeight,
       atlasScale,
       fontSize,
       ascent: tile.ascent,
       descent: tile.descent,
+      baseline: (tile.height + tile.ascent - tile.descent) / 2,
       cellColors,
       palette: currentScene.flattenColors?.enabled ? paletteAsHex(palette) : [],
     };
@@ -644,6 +667,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       palettePromise = null;
       paletteSamples = [];
       palette = [];
+      updateLayout();
       if (value?.naturalWidth) {
         try {
           setPaletteSamples([sampleSourceColors(value)]);
@@ -674,6 +698,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       const beforeFlatten = JSON.stringify(currentScene.flattenColors);
       const beforeRendering = currentScene.rendering?.mode;
       currentScene = cloneScene(value);
+      currentScene.typography.fontFamily = fontFamilyFor(currentScene.typography.fontFamily);
       currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
       currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
       currentScene.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
@@ -695,13 +720,44 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       rows: Number(canvas.dataset.rows) || 0,
       backend,
     }),
-    capturePng: () =>
-      new Promise((resolve, reject) =>
-        canvas.toBlob(
-          (blob) => (blob ? resolve(blob) : reject(new Error('Esportazione PNG non riuscita.'))),
-          'image/png',
-        ),
-      ),
+    capturePng: () => {
+      try {
+        const capture = captureText();
+        const output = document.createElement('canvas');
+        renderAsciiPage(output.getContext('2d'), capture, {
+          columns: capture.columns,
+          rows: capture.rows,
+          cellWidth: capture.cellWidth,
+          cellHeight: capture.cellHeight,
+          width: capture.outputWidth,
+          height: capture.outputHeight,
+          font: {
+            family: capture.vectorFamily ?? fontFamilyFor(currentScene.typography.fontFamily),
+            size: capture.fontSize,
+            weight: currentScene.typography.fontWeight,
+            ascent: capture.ascent,
+            descent: capture.descent,
+            baseline: capture.baseline,
+          },
+          colors: {
+            mode: currentScene.appearance.mode,
+            foreground: currentScene.appearance.foreground,
+            background: currentScene.appearance.background,
+          },
+          mode: currentScene.rendering.mode,
+          unitsPerEm: capture.unitsPerEm,
+          glyphs: capture.vectorGlyphs,
+        });
+        return new Promise((resolve, reject) =>
+          output.toBlob(
+            (blob) => (blob ? resolve(blob) : reject(new Error('Esportazione PNG non riuscita.'))),
+            'image/png',
+          ),
+        );
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
     dispose() {
       disposed = true;
       if (gl) {

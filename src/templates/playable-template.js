@@ -21,8 +21,11 @@ export async function createPlayableHtml(asciiDocument) {
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0c0f10;color:#e9eeec}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
-main{width:min(100%,1440px);display:grid;gap:14px}.frame{min-height:40vh;max-height:82vh;display:grid;place-items:center;overflow:auto;border:1px solid #252d2d;border-radius:10px;background:#101715;padding:18px}
-canvas{display:block;max-width:100%;max-height:78vh;object-fit:contain}.controls{display:flex;align-items:center;gap:12px;min-height:44px}
+main{width:min(100%,1440px);display:grid;gap:14px}.frame{min-height:40vh;max-height:82vh;display:grid;place-items:center;overflow:hidden;border:1px solid #252d2d;border-radius:10px;background:#101715;padding:18px}
+canvas{display:block;width:100%;height:100%;max-width:100%;max-height:78vh;object-fit:contain}.controls{display:flex;align-items:center;gap:12px;min-height:44px}
+main:fullscreen{width:100vw;height:100vh;max-width:none;padding:20px;grid-template-rows:minmax(0,1fr) auto}
+main:fullscreen .frame{min-height:0;max-height:none;height:100%;padding:16px}
+main:fullscreen canvas{max-height:none}
 button,input{font:inherit;color:inherit}button{border:1px solid #303938;border-radius:6px;background:#181d1e;padding:8px 12px;cursor:pointer}button:hover{background:#232a29}
 input[type=range]{accent-color:#9de5c4}.seek{flex:1;min-width:50px}.time{font:12px ui-monospace,monospace;white-space:nowrap}
 label{display:flex;align-items:center;gap:6px;font-size:12px}.status{min-height:1.4em;color:#f0a49b;font-size:13px}

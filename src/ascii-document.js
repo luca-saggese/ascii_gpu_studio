@@ -104,6 +104,8 @@ function validateAsciiDocument(document) {
     mode = 'bitmap',
     unitsPerEm,
     glyphs,
+    source,
+    target,
   } = document.render;
   let previousTimestamp = -1;
   const invalidFrame = document.frames.some((frame) => {
@@ -141,12 +143,28 @@ function validateAsciiDocument(document) {
     ) ||
     width !== columns * cellWidth ||
     height !== rows * cellHeight ||
+    (source &&
+      (!Number.isFinite(source.width) ||
+        source.width <= 0 ||
+        !Number.isFinite(source.height) ||
+        source.height <= 0)) ||
+    (target &&
+      (!Number.isFinite(target.width) ||
+        target.width <= 0 ||
+        !Number.isFinite(target.height) ||
+        target.height <= 0 ||
+        width > 1024 ||
+        height > 576 ||
+        width > target.width + 1e-6 ||
+        height > target.height + 1e-6)) ||
     !font ||
     typeof font.family !== 'string' ||
     !Number.isFinite(font.size) ||
     !Number.isFinite(font.weight) ||
     !Number.isFinite(font.ascent) ||
     !Number.isFinite(font.descent) ||
+    (font.baseline !== undefined && !Number.isFinite(font.baseline)) ||
+    (font.lineHeight !== undefined && !Number.isFinite(font.lineHeight)) ||
     (mode === 'vector' &&
       (!font.license ||
         font.license.license !== 'SIL Open Font License 1.1' ||
