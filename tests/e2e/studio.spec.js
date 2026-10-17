@@ -75,7 +75,7 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
 
   await page.getByRole('button', { name: 'ASCII text' }).click();
   const text = await page.getByLabel('Plain text ASCII preview').textContent();
-  expect(new Set(text.replaceAll('\n', '')).size).toBeLessThanOrEqual(2);
+  expect(new Set(text.replaceAll('\n', '')).size).toBeGreaterThan(2);
   await page.getByRole('button', { name: 'GPU', exact: true }).click();
   await page.getByLabel('Rendering vettoriale').check();
   const vector = page.locator('canvas[aria-label="ASCII vector rendering preview"]');
@@ -129,7 +129,7 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
     background: '#000000',
   });
   expect(document.frames[0]).not.toHaveProperty('colors');
-  expect(new Set(document.frames[0].text.replaceAll('\n', '')).size).toBeLessThanOrEqual(2);
+  expect(new Set(document.frames[0].text.replaceAll('\n', '')).size).toBeGreaterThan(2);
 });
 
 test('saves parameter defaults for reset and future sessions', async ({ page }) => {

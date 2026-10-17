@@ -156,7 +156,7 @@ void main(){
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
 
-  float glyphIndex=bwMode>.5 ? (value<.5 ? glyphCount-1. : 0.) : floor((1.-value)*(glyphCount-1.)+.5);
+  float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
   vec2 tilePixels=tileSize*atlasScale;
   vec2 atlasUv=vec2(
     (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
@@ -516,8 +516,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('paletteCount', palette.length);
 
     const appearanceColors = getAppearanceColors(currentScene.appearance);
-    setUniforms('foreground', ...color(currentScene.appearance.foreground));
-    setUniforms('background', ...color(currentScene.appearance.background));
+    setUniforms('foreground', ...color(appearanceColors.foreground));
+    setUniforms('background', ...color(appearanceColors.background));
     setUniforms(
       'fitMode',
       currentScene.appearance.fit === 'cover'
@@ -635,7 +635,6 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         );
         luminance = Math.pow(luminance, 1 / Math.max(currentScene.appearance.gamma, 0.05));
         if (currentScene.appearance.invert) luminance = 1 - luminance;
-        if (currentScene.appearance.mode === 'bw') luminance = luminance < 0.5 ? 0 : 1;
         const density = 1 - luminance;
         const glyphIndex = Math.round(density * (glyphs.length - 1));
         text += alpha < 0.05 ? ' ' : glyphs[glyphIndex];

@@ -7,7 +7,7 @@ Latest committed implementation: `240ddb2` (`fix(export): mux source video audio
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
 
-Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnpm format:check` pass. The Chromium run passes 16 tests, including strict B/W preview/export coverage; its remaining source-audio MP4 test cannot download because this installed browser lacks AAC WebCodecs encoding, and the Studio reports that capability limit. Safari is not included in the browser matrix. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification for the B/W fix: `pnpm lint`, `pnpm test` (16 tests), `pnpm build`, and the focused Chromium B/W preview/export regression pass. The focused test verifies multi-glyph ASCII text plus strictly black/white bitmap, vector, and PNG output. The targeted Prettier check still reports pre-existing formatting warnings in `STATUS.md`, `FILE_FORMAT.md`, and `AGENT_HANDOFF.md`; no workspace-wide reformat was applied. Safari is not included in the browser matrix.
 
 
 ## Works now
@@ -18,7 +18,7 @@ Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnp
 - One shared source layout measures integer font cells, fits complete rows/columns into 1024×576 while preserving source aspect, and drives WebGL, vector, fallback, ASCII capture, PNG, MP4, and HTML. Resize changes only display scale; logical dimensions and exports remain fixed. MP4 adds even-dimension padding only on the right/bottom.
 - Toggle between WebGL output and normal monospace ASCII text. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit; DPR affects only preview buffer resolution.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
-- Added a separate Black & white appearance mode: hard luminance thresholding selects only lightest/densest glyphs, forces white ink on black, and removes antialiased gray pixels from bitmap/vector previews and exports.
+- Added a separate Black & white appearance mode: the full charset still maps luminance to glyph density, while the rendered masks are hard-thresholded to black/white and use white ink on black.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
 - Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.
