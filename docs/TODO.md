@@ -16,6 +16,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-014 [P1] Remove user font-size control and improve raster detail — fixed internal 20 px glyph size, 4×–8× GPU-aware atlas scale, and 32–320 column control; covered by Chromium E2E.
 - [x] AGPU-056 [P1] Add shared gzip-JSON ASCII result format, deterministic frame sampling, optional audio capture, PNG export, standalone offline HTML player, and accessible export dropdown; browser coverage includes image color and video with/without audio.
 - [x] AGPU-058 [P1] Add fixed-scale Sobel Edge Detection with configurable smoothing, threshold, solo-edge/image blend modes, live WebGL preview, 2× grid ASCII conversion, and `.ascii` filter metadata; lint, unit, build, format, and Chromium E2E pass.
+- [x] AGPU-059 [P1] Save and persist the current full parameter set as browser defaults; startup and Reset settings restore it, covered by Chromium reload/reset E2E.
 
 ## In progress
 

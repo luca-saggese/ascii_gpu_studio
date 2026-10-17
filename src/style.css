@@ -260,6 +260,16 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
 }
+.panel-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.button.save-defaults {
+  height: 27px;
+  padding: 0 8px;
+  font-size: 10px;
+}
 .eyebrow {
   font: 9px var(--mono);
   letter-spacing: 0.16em;

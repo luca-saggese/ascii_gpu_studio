@@ -22,6 +22,25 @@ test('renders a polished empty state and adapts to mobile width', async ({ page 
   }
 });
 
+test('saves parameter defaults for reset and future sessions', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#columns').fill('144');
+  await page.getByLabel('Enable edge detection').check();
+  await page.getByLabel('Threshold value').fill('91');
+  await page.getByRole('button', { name: 'Save defaults' }).click();
+  await expect(page.getByText('Parametri predefiniti salvati')).toBeVisible();
+  await page.locator('#columns').fill('72');
+  await page.getByLabel('Enable edge detection').uncheck();
+  await page.locator('.panel-heading-actions .icon-button').click();
+  await expect(page.locator('#columns')).toHaveValue('144');
+  await expect(page.getByLabel('Enable edge detection')).toBeChecked();
+  await expect(page.getByLabel('Threshold value')).toHaveValue('91');
+  await page.reload();
+  await expect(page.locator('#columns')).toHaveValue('144');
+  await expect(page.getByLabel('Enable edge detection')).toBeChecked();
+  await expect(page.getByLabel('Threshold value')).toHaveValue('91');
+});
+
 test('imports an image, renders through WebGL2, and exports the source project', async ({
   page,
 }, testInfo) => {

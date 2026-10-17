@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { DEFAULT_SCENE } from './core.js';
+import { DEFAULT_SCENE, validateScene } from './core.js';
 import { createAsciiRenderer } from './renderer.js';
 import { readAscii } from './format.js';
 import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-document.js';
@@ -9,12 +9,36 @@ import { renderAsciiPng } from './ascii-render.js';
 import { createPlayableHtml } from './templates/playable-template.js';
 import { assertDeterministicMp4Support } from './mp4-export.js';
 
+const DEFAULTS_STORAGE_KEY = 'ascii-gpu-studio:scene-defaults:v1';
+let defaultsLoadError = '';
+
+function cloneScene(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readSavedDefaults() {
+  const saved = window.localStorage.getItem(DEFAULTS_STORAGE_KEY);
+  if (saved === null) return null;
+  const parsed = JSON.parse(saved);
+  validateScene(parsed);
+  return cloneScene(parsed);
+}
+
+function getInitialScene() {
+  try {
+    return readSavedDefaults() ?? cloneScene(DEFAULT_SCENE);
+  } catch (cause) {
+    defaultsLoadError = `Impossibile caricare i parametri predefiniti salvati: ${cause.message}`;
+    return cloneScene(DEFAULT_SCENE);
+  }
+}
+
 const canvas = ref(null);
 const picker = ref(null);
 const exportMenu = ref(null);
 const exportButton = ref(null);
 const video = ref(null);
-const scene = ref(structuredClone(DEFAULT_SCENE));
+const scene = ref(getInitialScene());
 const mediaFile = ref(null);
 const mediaName = ref('');
 const mediaKind = ref('');
@@ -25,7 +49,7 @@ const statsLabel = ref({ columns: 0, rows: 0, outputWidth: 0, outputHeight: 0, b
 const playing = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
-const error = ref('');
+const error = ref(defaultsLoadError);
 const message = ref('');
 const busy = ref(false);
 const exportProgress = ref(0);
@@ -337,7 +361,24 @@ function download(blob, name) {
 }
 
 function resetScene() {
-  scene.value = structuredClone(DEFAULT_SCENE);
+  try {
+    scene.value = readSavedDefaults() ?? cloneScene(DEFAULT_SCENE);
+    error.value = '';
+  } catch (cause) {
+    error.value = `Impossibile caricare i parametri predefiniti salvati: ${cause.message}`;
+    scene.value = cloneScene(DEFAULT_SCENE);
+  }
+}
+
+function saveDefaults() {
+  try {
+    validateScene(scene.value);
+    window.localStorage.setItem(DEFAULTS_STORAGE_KEY, JSON.stringify(scene.value));
+    notify('Parametri predefiniti salvati');
+    error.value = '';
+  } catch (cause) {
+    error.value = `Impossibile salvare i parametri predefiniti: ${cause.message}`;
+  }
 }
 
 onMounted(() => {
@@ -482,7 +523,10 @@ function onKeydown(event) {
             <span class="eyebrow">WORKSPACE</span>
             <h1>Studio</h1>
           </div>
-          <button class="icon-button small" title="Reset settings" @click="resetScene">↻</button>
+          <div class="panel-heading-actions">
+            <button class="button subtle save-defaults" @click="saveDefaults">Save defaults</button>
+            <button class="icon-button small" title="Reset settings" @click="resetScene">↻</button>
+          </div>
         </div>
         <section class="inspector-section">
           <div class="section-title">

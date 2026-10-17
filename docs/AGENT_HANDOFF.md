@@ -6,6 +6,8 @@ Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio impor
 
 The single export menu and gzip JSON ASCII document are implemented. It includes deterministic 100 ms video seeking, optional source-audio capture, worker-rendered PNG, and a self-contained offline HTML player. The MP4 option reports unsupported in this Chromium rather than using real-time recording. Edge Detection is implemented in the WebGL2 preview and shared ASCII capture path, with fixed-scale Sobel, optional Gaussian smoothing, modes, threshold, and intensity metadata. PNG and HTML show converted pages without recalculating the filter. Latest `pnpm lint`, `pnpm test` (10), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (8) pass. The PNG-after-import E2E issue was resolved by copying reactive Vue data into plain objects before posting to the worker.
 
+The Studio also has **Save defaults**: it persists the full validated scene in browser localStorage; startup and Reset settings apply the saved values. The E2E checks saving, resetting, and reload persistence.
+
 ## First files to read
 
 1. `docs/STATUS.md`, `docs/TODO.md`, `docs/ARCHITECTURE.md`, `docs/FILE_FORMAT.md`

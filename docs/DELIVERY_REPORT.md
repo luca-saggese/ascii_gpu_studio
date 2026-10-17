@@ -9,6 +9,7 @@
 - HTML playable is a single offline `.html`: it embeds the compressed `.ascii` bytes as Base64, includes a self-contained player and the same page renderer, and has play/pause, seek, clock, volume, mute, and fullscreen controls. With audio it follows the audio clock; without audio it uses a monotonic clock. ASCII data is passed to `fillText`, never `innerHTML`.
 - Old ZIP `.ascii` projects still import. New `.ascii` exports do not contain their original image/video or thumbnails.
 - Edge Detection is available before conversion: fixed-scale Sobel over luminance, configurable threshold and Gaussian smoothing, Solo bordi and Bordi + immagine modes, adjustable blend intensity, and preserved source colors in RGB mode. The live preview evaluates it in WebGL2. ASCII capture oversamples at 2× grid resolution; exported frame pages are already filtered, and `.ascii` stores the chosen settings as metadata for inspection only.
+- Save defaults persists the complete validated scene locally; Studio startup and Reset settings restore it. Storage or invalid-data errors are surfaced instead of silently ignored.
 
 ## Verified
 
