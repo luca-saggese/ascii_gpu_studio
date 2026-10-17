@@ -77,6 +77,7 @@ test('imports an image, renders through WebGL2, and exports the source project',
     canvas.getContext('2d').drawImage(image, 0, 0);
     return canvas.toDataURL('image/png').split(',')[1];
   });
+
   await page.locator('input[type=file]').setInputFiles({
     name: 'studio-sample.png',
     mimeType: 'image/png',
@@ -242,6 +243,124 @@ test('imports an image, renders through WebGL2, and exports the source project',
     return true;
   }, pngDataUrl);
   expect(matchesPng).toBe(true);
+  await offlinePage.close();
+});
+
+test('renders and exports OpenType vector glyph outlines offline', async ({ page }, testInfo) => {
+  await page.goto('/');
+  const outlineChecks = await page.evaluate(async () => {
+    const { loadOutlineFonts, vectorGlyphs } = await import('/src/glyph-geometry.js');
+    await loadOutlineFonts();
+    const outline = vectorGlyphs('IBM Plex Mono', 'Oé.,!?', 500).glyphs;
+    const canvas = document.createElement('canvas');
+    canvas.width = 700;
+    canvas.height = 900;
+    const context = canvas.getContext('2d');
+    context.translate(0, 800);
+    context.fill(new Path2D(outline.O.path), 'evenodd');
+    return {
+      characters: Object.keys(outline),
+      holeAlpha: context.getImageData(300, 451, 1, 1).data[3],
+      strokeAlpha: context.getImageData(80, 451, 1, 1).data[3],
+    };
+  });
+  expect(outlineChecks.characters).toEqual(expect.arrayContaining(Array.from('Oé.,!?')));
+  expect(outlineChecks.holeAlpha).toBe(0);
+  expect(outlineChecks.strokeAlpha).toBeGreaterThan(0);
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 96;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, 96, 64);
+    context.fillStyle = '#000';
+    context.beginPath();
+    context.arc(48, 32, 22, 0, Math.PI * 2);
+    context.fill();
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'vector-outline.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+  await page.getByLabel('Rendering vettoriale').check();
+  const preview = page.locator('canvas[aria-label="ASCII vector rendering preview"]');
+  await expect(preview).toBeVisible();
+  await expect
+    .poll(() => preview.evaluate((canvas) => canvas.width * canvas.height))
+    .toBeGreaterThan(0);
+  const inkPixels = await preview.evaluate((canvas) => {
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    let count = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      if (data[index] > 150 && data[index + 1] > 150 && data[index + 2] > 150) count += 1;
+    }
+    return count;
+  });
+  expect(inkPixels).toBeGreaterThan(0);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const document = JSON.parse(strFromU8(gunzipSync(await readFile(await (await download).path()))));
+  expect(document.render.mode).toBe('vector');
+  expect(document.render.font.family).toBe('IBM Plex Mono');
+  expect(document.render.font.license.license).toBe('SIL Open Font License 1.1');
+  expect(Object.keys(document.render.glyphs).length).toBeGreaterThan(0);
+  for (const character of new Set(Array.from(document.frames[0].text)))
+    expect(Object.hasOwn(document.render.glyphs, character)).toBe(true);
+
+  const pngDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export PNG' }).click();
+  const pngBytes = await readFile(await (await pngDownload).path());
+  const pngMatchesPreview = await page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const expectedCanvas = document.querySelector(
+      'canvas[aria-label="ASCII vector rendering preview"]',
+    );
+    const output = document.createElement('canvas');
+    output.width = image.width;
+    output.height = image.height;
+    const context = output.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const expected = expectedCanvas.getContext('2d').getImageData(0, 0, image.width, image.height);
+    const actual = context.getImageData(0, 0, image.width, image.height);
+    return expected.data.every((value, index) => value === actual.data[index]);
+  }, pngBytes.toString('base64'));
+  expect(pngMatchesPreview).toBe(true);
+
+  const htmlDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export HTML playable' }).click();
+  const previewDataUrl = await preview.evaluate((canvas) => canvas.toDataURL());
+  const offlinePage = await page.context().newPage();
+  const htmlPath = testInfo.outputPath('vector-player.html');
+  await writeFile(htmlPath, await readFile(await (await htmlDownload).path()));
+  const requests = [];
+  offlinePage.on('request', (request) => requests.push(request.url()));
+  await offlinePage.goto(pathToFileURL(htmlPath).href);
+  await expect(offlinePage.locator('canvas')).toHaveJSProperty('width', document.render.width);
+  const offlineMatchesPreview = await offlinePage.evaluate(async (previewUrl) => {
+    const image = new Image();
+    image.src = previewUrl;
+    await image.decode();
+    const canvas = document.querySelector('canvas');
+    const context = canvas.getContext('2d');
+    const expected = document.createElement('canvas');
+    expected.width = image.width;
+    expected.height = image.height;
+    const expectedContext = expected.getContext('2d');
+    expectedContext.drawImage(image, 0, 0);
+    const source = expectedContext.getImageData(0, 0, image.width, image.height);
+    const actual = context.getImageData(0, 0, image.width, image.height);
+    return source.data.every((value, index) => value === actual.data[index]);
+  }, previewDataUrl);
+  expect(offlineMatchesPreview).toBe(true);
+  expect(requests.filter((url) => url.startsWith('http'))).toEqual([]);
   await offlinePage.close();
 });
 

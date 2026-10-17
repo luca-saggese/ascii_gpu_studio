@@ -92,7 +92,19 @@ function validateAsciiDocument(document) {
   }
   if (document.contentType === 'image' && (document.frames.length !== 1 || document.audio))
     throw new Error('Un documento immagine deve contenere una sola pagina e nessun audio.');
-  const { columns, rows, width, height, cellWidth, cellHeight, font, colors } = document.render;
+  const {
+    columns,
+    rows,
+    width,
+    height,
+    cellWidth,
+    cellHeight,
+    font,
+    colors,
+    mode = 'bitmap',
+    unitsPerEm,
+    glyphs,
+  } = document.render;
   let previousTimestamp = -1;
   const invalidFrame = document.frames.some((frame) => {
     const lines = typeof frame?.text === 'string' ? frame.text.split('\n') : [];
@@ -117,6 +129,8 @@ function validateAsciiDocument(document) {
     return (
       lines.length !== rows ||
       lines.some((line) => codePointLength(line) !== columns) ||
+      (mode === 'vector' &&
+        Array.from(lines.join('')).some((glyph) => !Object.hasOwn(glyphs ?? {}, glyph))) ||
       invalidColor ||
       invalidTiming
     );
@@ -133,6 +147,23 @@ function validateAsciiDocument(document) {
     !Number.isFinite(font.weight) ||
     !Number.isFinite(font.ascent) ||
     !Number.isFinite(font.descent) ||
+    (mode === 'vector' &&
+      (!font.license ||
+        font.license.license !== 'SIL Open Font License 1.1' ||
+        typeof font.license.copyright !== 'string')) ||
+    !['bitmap', 'vector'].includes(mode) ||
+    (mode === 'vector' &&
+      (!Number.isFinite(unitsPerEm) ||
+        unitsPerEm <= 0 ||
+        !glyphs ||
+        typeof glyphs !== 'object' ||
+        Object.values(glyphs).some(
+          (glyph) =>
+            !glyph ||
+            typeof glyph.path !== 'string' ||
+            !Number.isFinite(glyph.advanceWidth) ||
+            glyph.advanceWidth < 0,
+        ))) ||
     !colors ||
     !['mono', 'rgb'].includes(colors.mode) ||
     !/^#[\da-f]{6}$/i.test(colors.foreground) ||

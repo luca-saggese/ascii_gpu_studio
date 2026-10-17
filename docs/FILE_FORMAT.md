@@ -33,12 +33,13 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
     "height": 1296,
     "cellAspect": 0.5833,
     "font": {
-      "family": "monospace",
+      "family": "IBM Plex Mono",
       "size": 20,
       "weight": 500,
       "ascent": 15,
       "descent": 4
     },
+    "mode": "bitmap",
     "colors": {
       "mode": "mono",
       "foreground": "#d5f5e9",
@@ -65,6 +66,27 @@ The serialization and validation boundary lives in `src/ascii-document.js`; imag
 `filters.edgeDetection` records the settings used to make the pages. The pages already contain the filtered ASCII result; readers and the offline HTML player display them directly and do not rerun edge detection.
 
 `filters.flattenColors` stores the selected color count, bilateral smoothing strength, and the palette as hexadecimal sRGB colors. Video palettes are sampled globally from six evenly spaced frames and held fixed for the entire sequence. In RGB mode, each cell's stored color is selected from this palette, so the HTML player reproduces the flat colors without rerunning quantization.
+
+## Vector glyph rendering
+
+Bitmap rendering remains the default. Vector documents set `render.mode` to `"vector"` and store:
+
+```json
+{
+  "mode": "vector",
+  "unitsPerEm": 1000,
+  "glyphs": {
+    "O": {
+      "path": "M…",
+      "advanceWidth": 600
+    }
+  }
+}
+```
+
+`glyphs` is a document-wide map keyed by Unicode code point; each outline is shared by every occurrence and video page. Paths retain the parsed font curves in font units, including multiple contours. Readers fill paths with the even-odd rule, without stroke. Only characters actually present in the pages are included. No font atlas, raster glyph, source font binary, or original media is embedded in this mode. Family, weight, font size, cell metrics, foreground/background and per-cell colors remain part of `render`. `render.font.license` records the bundled font's SIL OFL 1.1 designation and copyright attribution alongside the derived paths.
+
+The Studio bundles IBM Plex Mono, Cousine, and Lora under the SIL Open Font License 1.1 to make font selection and offline vector playback deterministic. Their notices are included in `public/licenses/`. The standalone HTML requires no installed font, CDN, or network request when `render.mode` is `"vector"`; it uses the embedded paths and the same `Path2D` even-odd fill used by PNG.
 
 ## Legacy import
 

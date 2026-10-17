@@ -3,10 +3,11 @@ export const DEFAULT_SCENE = Object.freeze({
   grid: { columns: 96, maxCells: 40000 },
   typography: {
     charset: ' .,:;irsXA253hMHGS#9B&@',
-    fontFamily: 'monospace',
+    fontFamily: 'IBM Plex Mono',
     fontSize: 14,
     fontWeight: 500,
   },
+  rendering: { mode: 'bitmap' },
   appearance: {
     mode: 'mono',
     foreground: '#d5f5e9',
@@ -38,6 +39,7 @@ export function validateScene(scene) {
   const gamma = Number(scene?.appearance?.gamma);
   const edge = scene?.edgeDetection ?? DEFAULT_SCENE.edgeDetection;
   const flatten = scene?.flattenColors ?? DEFAULT_SCENE.flattenColors;
+  const rendering = scene?.rendering ?? DEFAULT_SCENE.rendering;
   if (!Number.isInteger(columns) || columns < 16 || columns > 320)
     throw new Error('La griglia deve avere da 16 a 320 colonne.');
   if (!Number.isInteger(maxCells) || maxCells < columns || maxCells > 100000)
@@ -61,6 +63,20 @@ export function validateScene(scene) {
     throw new Error('Modalità colore non supportata.');
   if (!['contain', 'cover', 'stretch'].includes(scene.appearance.fit))
     throw new Error('Modalità di adattamento non supportata.');
+  if (!['bitmap', 'vector'].includes(rendering.mode))
+    throw new Error('Modalità di rendering dei glifi non supportata.');
+  if (
+    ![
+      'IBM Plex Mono',
+      'Cousine',
+      'Lora',
+      'monospace',
+      'Courier New',
+      'ui-monospace',
+      'serif',
+    ].includes(scene.typography.fontFamily)
+  )
+    throw new Error('Font non supportato.');
   if (
     typeof edge?.enabled !== 'boolean' ||
     !Number.isInteger(edge.threshold) ||
@@ -89,7 +105,14 @@ export function validateScene(scene) {
     if (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value))
       throw new Error('I colori devono essere valori esadecimali #RRGGBB.');
   }
+
   return true;
+}
+
+export function fontFamilyFor(fontFamily) {
+  if (fontFamily === 'Courier New' || fontFamily === 'Cousine') return 'Cousine';
+  if (fontFamily === 'serif' || fontFamily === 'Lora') return 'Lora';
+  return 'IBM Plex Mono';
 }
 
 export function gridForSource(width, height, columns, cellAspect = 0.58) {

@@ -174,12 +174,22 @@ function createDocument({ kind, scene, firstPage, audio }) {
       height: rows * cellHeight,
       cellAspect: cellWidth / cellHeight,
       font: {
-        family: scene.typography.fontFamily,
+        family: firstPage.capture.vectorFamily ?? scene.typography.fontFamily,
         size: fontSize,
         weight: scene.typography.fontWeight,
         ascent,
         descent,
+        ...(firstPage.capture.vectorFontLicense
+          ? { license: firstPage.capture.vectorFontLicense }
+          : {}),
       },
+      mode: firstPage.capture.vectorGlyphs ? 'vector' : 'bitmap',
+      ...(firstPage.capture.vectorGlyphs
+        ? {
+            unitsPerEm: firstPage.capture.unitsPerEm,
+            glyphs: { ...firstPage.capture.vectorGlyphs },
+          }
+        : {}),
       colors: {
         mode: scene.appearance.mode,
         foreground: scene.appearance.foreground,
@@ -254,6 +264,8 @@ export async function captureAsciiDocument({
           Math.min(FRAME_INTERVAL_MS, video.duration * 1000 - timestampMs),
         ),
       );
+      if (document.render.mode === 'vector')
+        Object.assign(document.render.glyphs, capture.vectorGlyphs);
       onProgress(0.4 + 0.6 * (index / Math.max(frameCount - 1, 1)));
       await new Promise((resolve) => setTimeout(resolve, 0));
     }

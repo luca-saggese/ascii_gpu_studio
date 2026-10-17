@@ -1,4 +1,11 @@
-import { coverageOrder, DEFAULT_SCENE, gridForSource, validateScene } from './core.js';
+import {
+  coverageOrder,
+  DEFAULT_SCENE,
+  fontFamilyFor,
+  gridForSource,
+  validateScene,
+} from './core.js';
+import { vectorGlyphs } from './glyph-geometry.js';
 import { createEdgeMap } from './edge-detection.js';
 import {
   buildColorPalette,
@@ -189,7 +196,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   const sourceTex = gl.createTexture();
-  const atlasTex = gl.createTexture();
+  let atlasTex = gl.createTexture();
   const paletteTex = gl.createTexture();
   const locations = Object.fromEntries(
     [
@@ -225,6 +232,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let currentScene = cloneScene(scene);
   currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
   currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
+  currentScene.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
   let atlas = null;
   let disposed = false;
   let lastStats = '';
@@ -273,13 +281,14 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   }
 
   function makeAtlas() {
+    const fontFamily = fontFamilyFor(currentScene.typography.fontFamily);
     const chars = coverageOrder(
       currentScene.typography.charset,
-      currentScene.typography.fontFamily,
+      `"${fontFamily}"`,
       fontSize,
       currentScene.typography.fontWeight,
     );
-    const font = `${currentScene.typography.fontWeight} ${fontSize}px ${currentScene.typography.fontFamily}`;
+    const font = `${currentScene.typography.fontWeight} ${fontSize}px "${fontFamily}"`;
     const measurementCanvas = document.createElement('canvas');
     const measurementContext = measurementCanvas.getContext('2d');
     measurementContext.font = font;
@@ -295,6 +304,13 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     tile.descent = descent;
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
+    if (currentScene.rendering?.mode === 'vector') {
+      if (atlasTex) gl.deleteTexture(atlasTex);
+      atlasTex = null;
+      atlas = { count: chars.length, chars };
+      return;
+    }
+    if (!atlasTex) atlasTex = gl.createTexture();
     atlasScale = Math.max(
       1,
       Math.floor(
@@ -330,6 +346,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   }
 
   function renderFrame() {
+    if (currentScene.rendering?.mode === 'vector') return;
     if (disposed || !source || (!source.videoWidth && !source.naturalWidth && !source.width))
       return;
     const width = source.videoWidth || source.naturalWidth || source.width;
@@ -515,7 +532,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       }
       if (y < grid.rows - 1) text += '\n';
     }
-    return {
+    const capture = {
       text,
       columns: grid.columns,
       rows: grid.rows,
@@ -528,6 +545,18 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       cellColors,
       palette: currentScene.flattenColors?.enabled ? paletteAsHex(palette) : [],
     };
+    if (currentScene.rendering?.mode === 'vector') {
+      const vector = vectorGlyphs(
+        currentScene.typography.fontFamily,
+        text,
+        currentScene.typography.fontWeight,
+      );
+      capture.vectorGlyphs = vector.glyphs;
+      capture.vectorFamily = vector.family;
+      capture.unitsPerEm = vector.unitsPerEm;
+      capture.vectorFontLicense = vector.fontLicense;
+    }
+    return capture;
   }
 
   makeAtlas();
@@ -566,10 +595,16 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       validateScene(value);
       const before = JSON.stringify(currentScene.typography);
       const beforeFlatten = JSON.stringify(currentScene.flattenColors);
+      const beforeRendering = currentScene.rendering?.mode;
       currentScene = cloneScene(value);
       currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
       currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
-      if (before !== JSON.stringify(currentScene.typography)) makeAtlas();
+      currentScene.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
+      if (
+        before !== JSON.stringify(currentScene.typography) ||
+        beforeRendering !== currentScene.rendering.mode
+      )
+        makeAtlas();
       if (beforeFlatten !== JSON.stringify(currentScene.flattenColors) && paletteSamples.length)
         rebuildPalette();
       renderFrame();
@@ -593,7 +628,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     dispose() {
       disposed = true;
       gl.deleteTexture(sourceTex);
-      gl.deleteTexture(atlasTex);
+      if (atlasTex) gl.deleteTexture(atlasTex);
       gl.deleteTexture(paletteTex);
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);

@@ -758,6 +758,17 @@ input[type='range'] {
   object-fit: contain;
   image-rendering: auto;
 }
+.canvas-frame canvas.vector-preview,
+.canvas-frame canvas.bitmap-hidden {
+  position: absolute;
+  inset: 0;
+}
+.canvas-frame canvas.bitmap-hidden {
+  visibility: hidden;
+}
+.canvas-frame canvas.vector-preview {
+  z-index: 1;
+}
 .canvas-label {
   position: absolute;
   top: 0;

@@ -69,6 +69,39 @@ describe('.ascii project format', () => {
       ).rejects.toThrow(/immagine/);
     });
 
+    it('round-trips vector outlines once and embeds an offline path renderer', async () => {
+      const vector = {
+        ...sample,
+        render: {
+          ...sample.render,
+          font: {
+            ...sample.render.font,
+            license: {
+              license: 'SIL Open Font License 1.1',
+              copyright: 'Copyright 2017 IBM Corp.',
+            },
+          },
+          mode: 'vector',
+          unitsPerEm: 1000,
+          glyphs: {
+            '<': { path: 'M0 0L400 0L400 700L0 700Z', advanceWidth: 500 },
+            '&': {
+              path: 'M0 0L700 0L700 700L0 700ZM200 200L200 500L500 500L500 200Z',
+              advanceWidth: 700,
+            },
+            '>': { path: 'M0 0L400 0L400 700L0 700Z', advanceWidth: 500 },
+          },
+        },
+      };
+      const bytes = await serializeAsciiDocument(vector);
+      expect(await deserializeAsciiDocument(bytes)).toEqual(vector);
+      const html = await createPlayableHtml(vector);
+      const source = await html.text();
+      expect(source).toContain("context.fill(path, 'evenodd')");
+      expect(source).toContain('new Path2D(outline.path)');
+      expect(source).not.toContain('font-face');
+    });
+
     it('accepts frame data above the former cumulative cell ceiling', () => {
       const columns = 20_000_001;
       const large = {

@@ -1,4 +1,6 @@
 export function renderAsciiPage(context, page, render) {
+  const vectorPathCache = context.vectorPathCache ?? new Map();
+  context.vectorPathCache = vectorPathCache;
   const { columns, rows, cellWidth, cellHeight, width, height, font } = render;
   const { foreground, background, mode } = render.colors;
   context.canvas.width = width;
@@ -10,13 +12,16 @@ export function renderAsciiPage(context, page, render) {
   context.textBaseline = 'alphabetic';
   context.fillStyle = foreground;
   const lines = page.text.split('\n');
-  let colors = null;
+  let colors = page.cellColors ?? null;
   if (page.colors) {
     const binary = atob(page.colors);
     if (binary.length !== columns * rows * 3)
       throw new Error('Colori per cella non validi nel documento ASCII.');
     colors = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   }
+  if (colors && colors.length !== columns * rows * 3)
+    throw new Error('Colori per cella non validi nel documento ASCII.');
+  const vectorBatches = new Map();
   for (let y = 0; y < rows; y += 1) {
     const line = Array.from(lines[y] || '');
     const baseline = y * cellHeight + (cellHeight + font.ascent - font.descent) / 2;
@@ -28,8 +33,31 @@ export function renderAsciiPage(context, page, render) {
       } else {
         context.fillStyle = foreground;
       }
-      context.fillText(glyph, x * cellWidth + cellWidth / 2, baseline);
+      if (render.mode === 'vector') {
+        const outline = render.glyphs?.[glyph];
+        if (!outline) throw new Error(`Geometria vettoriale mancante per il glifo ${glyph}.`);
+        let path = vectorPathCache.get(outline.path);
+        if (!path) {
+          path = new Path2D(outline.path);
+          vectorPathCache.set(outline.path, path);
+        }
+        const scale = font.size / render.unitsPerEm;
+        const left = x * cellWidth + (cellWidth - outline.advanceWidth * scale) / 2;
+        const color = context.fillStyle;
+        let batch = vectorBatches.get(color);
+        if (!batch) {
+          batch = new Path2D();
+          vectorBatches.set(color, batch);
+        }
+        batch.addPath(path, new DOMMatrix([scale, 0, 0, scale, left, baseline]));
+      } else {
+        context.fillText(glyph, x * cellWidth + cellWidth / 2, baseline);
+      }
     }
+  }
+  for (const [color, path] of vectorBatches) {
+    context.fillStyle = color;
+    context.fill(path, 'evenodd');
   }
   return context.canvas;
 }

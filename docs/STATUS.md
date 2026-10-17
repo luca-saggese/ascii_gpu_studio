@@ -2,11 +2,11 @@
 
 Current milestone: M6 — release hardening, **partial implementation; not release-ready**
 
-Latest verified implementation commit: `e835d84` (`fix(renderer): sample complete glyphs with measured cell metrics`); subsequent renderer/text-preview fixes are verified in the working tree and awaiting commit.
+Latest committed implementation: `24a0ecc` (`fix(export): allow large ASCII exports and optional audio`); vector-rendering work is in the current working tree and has not been committed.
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification: `pnpm lint`, `pnpm test` (13 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (13 tests) all pass. Video ASCII export now continues without audio if the browser cannot capture it, and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification after vector rendering: `pnpm lint`, `pnpm test` (14 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (14 Chromium tests) all pass. Video ASCII export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
@@ -24,6 +24,8 @@ Latest verification: `pnpm lint`, `pnpm test` (13 tests), `pnpm build`, `pnpm fo
 - If audio capture is unavailable or fails, video ASCII frame export continues without audio and notifies the user; cancellation still aborts the export.
 - A single keyboard-accessible Export dropdown offers ASCII, contextual PNG/MP4, and standalone offline HTML. It supports Escape/outside click and reports cancellable progress for video conversion.
 - PNG rasterizes the ASCII document at configured cell resolution in an OffscreenCanvas worker when available; the same drawing function is embedded in the offline HTML player.
+- Optional vector glyph rendering uses parsed OpenType outlines and even-odd `Path2D` fills, cached by font/weight/glyph/precision. Bitmap remains the default. IBM Plex Mono, Cousine, and Lora are bundled under SIL OFL 1.1 and shared by both renderer modes. The vector `.ascii` mode stores deduplicated outline geometry only for glyphs present in captured pages plus font license attribution; PNG and offline HTML use those same paths without a font or raster atlas.
+- Vector preview uses Canvas 2D path rasterization rather than WebGL; large grids and video can therefore be slower than bitmap preview.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
 - MP4 is intentionally not emitted in this environment: Chromium reports MediaRecorder MP4 support but has no WebCodecs, and a verified MP4 muxer is not bundled. The UI reports this accurately instead of making a nondeterministic real-time recording.

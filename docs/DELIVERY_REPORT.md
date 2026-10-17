@@ -12,18 +12,19 @@
 - Edge Detection is available before conversion: fixed-scale Sobel over luminance, configurable threshold and Gaussian smoothing, Solo bordi and Bordi + immagine modes, adjustable blend intensity, and preserved source colors in RGB mode. The live preview evaluates it in WebGL2. ASCII capture oversamples at 2× grid resolution; exported frame pages are already filtered, and `.ascii` stores the chosen settings as metadata for inspection only.
 - Save defaults persists the complete validated scene locally; Studio startup and Reset settings restore it. Storage or invalid-data errors are surfaced instead of silently ignored.
 - Flatten Colors uses bilateral smoothing and OKLab palette assignment (2–64 colors, default 16), with no dithering. A video palette is sampled from six distributed timestamps and held for the clip. Preview and ASCII capture use the same fixed palette; in RGB mode final cell colors are palette entries, saved alongside palette/settings metadata so offline HTML does not recalculate the filter.
+- **Rendering vettoriale** is an opt-in scene setting; bitmap remains the default. The Studio parses outlines from bundled IBM Plex Mono, Cousine, or Lora OpenType/WOFF fonts, caches paths by family/weight/glyph/precision, and fills contours without stroke using the even-odd rule. Preview does not use the bitmap glyph atlas in vector mode. Version 1 `.ascii` stores each used outline once across all pages; PNG and offline HTML render that geometry directly and embed no glyph raster/font dependency. Font license notices are included in `public/licenses/`.
 
 ## Verified
 
 | Check               | Result                     |
 | ------------------- | -------------------------- |
 | `pnpm lint`         | Passed                     |
-| `pnpm test`         | Passed — 13 tests          |
+| `pnpm test`         | Passed — 14 tests          |
 | `pnpm build`        | Passed                     |
 | `pnpm format:check` | Passed                     |
-| `pnpm test:e2e`     | Passed — 13 Chromium tests |
+| `pnpm test:e2e`     | Passed — 14 Chromium tests |
 
-E2E covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, video frame export when audio capture is unavailable, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
+E2E additionally verifies vector preview and export, accented characters/punctuation, and that the `O` counter remains empty under even-odd path filling. It covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, video frame export when audio capture is unavailable, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
 
 ## MP4 limitation — explicit
 
@@ -32,10 +33,11 @@ The MP4 menu action is implemented as a capability-checked operation but does no
 ## Additional limitations
 
 - Video audio extraction for `.ascii` uses `HTMLMediaElement.captureStream()` and MediaRecorder with WebM/Opus. It is browser-dependent and runs in real time; browsers without capture or a supported audio recorder report an error. Video frame sampling itself remains deterministic.
-- HTML uses the locally installed monospace font family, not an embedded font binary. Glyph appearances can differ across systems with different fonts.
+- Bitmap HTML retains its existing system-font dependency and can differ across systems. Vector HTML is font-independent because it embeds used outline paths; font choices are bundled SIL OFL 1.1 assets for reproducible outlines.
+- Vector preview uses Canvas 2D `Path2D`, not WebGL, so large grids and video can render more slowly than bitmap mode.
 - Video page sampling is fixed at 10 fps, not source-native frame rate. It preserves the sampled timeline/duration but cannot represent motion faster than the sampling interval.
 - The former 20-million-cumulative-cell ceiling has been removed. Long exports allocate page text and optional audio bytes in memory; video exports remain capped at 30 minutes and can be cancelled. Browser memory and compressed/expanded document size caps can still constrain very large files; compression itself has no fine-grained progress reporting.
-- MP4, external font embedding, browser matrix, and measured performance coverage remain release work.
+- MP4, browser matrix, and measured performance coverage remain release work.
 
 ## Format and implementation references
 

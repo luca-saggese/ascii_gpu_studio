@@ -1,13 +1,15 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { DEFAULT_SCENE, validateScene } from './core.js';
+import { DEFAULT_SCENE, fontFamilyFor, validateScene } from './core.js';
 import { createAsciiRenderer } from './renderer.js';
+import { loadOutlineFonts } from './glyph-geometry.js';
 import { readAscii } from './format.js';
 import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-document.js';
 import { captureAsciiDocument } from './ascii-export.js';
 import { renderAsciiPng } from './ascii-render.js';
 import { createPlayableHtml } from './templates/playable-template.js';
 import { assertDeterministicMp4Support } from './mp4-export.js';
+import { renderAsciiPage } from './ascii-render.js';
 
 const DEFAULTS_STORAGE_KEY = 'ascii-gpu-studio:scene-defaults:v1';
 let defaultsLoadError = '';
@@ -16,11 +18,60 @@ function cloneScene(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function renderCurrentFrame() {
+  renderer.value?.renderFrame();
+  if (scene.value.rendering?.mode !== 'vector' || asciiMode.value || !vectorCanvas.value) return;
+  if (!outlineFontsReady) {
+    if (!outlineFontsLoading) {
+      outlineFontsLoading = loadOutlineFonts()
+        .then(() => {
+          outlineFontsReady = true;
+          renderCurrentFrame();
+        })
+        .catch((cause) => {
+          error.value = cause.message;
+        });
+    }
+    return;
+  }
+  try {
+    const capture = renderer.value?.captureText();
+    if (!capture?.vectorGlyphs) return;
+    renderAsciiPage(vectorCanvas.value.getContext('2d'), capture, {
+      columns: capture.columns,
+      rows: capture.rows,
+      cellWidth: capture.cellWidth,
+      cellHeight: capture.cellHeight,
+      width: capture.columns * capture.cellWidth,
+      height: capture.rows * capture.cellHeight,
+      font: {
+        family: capture.vectorFamily,
+        size: capture.fontSize,
+        weight: scene.value.typography.fontWeight,
+        ascent: capture.ascent,
+        descent: capture.descent,
+      },
+      colors: {
+        mode: scene.value.appearance.mode,
+        foreground: scene.value.appearance.foreground,
+        background: scene.value.appearance.background,
+      },
+      mode: 'vector',
+      unitsPerEm: capture.unitsPerEm,
+      glyphs: capture.vectorGlyphs,
+    });
+  } catch (cause) {
+    error.value = cause.message;
+  }
+}
+
 function readSavedDefaults() {
   const saved = window.localStorage.getItem(DEFAULTS_STORAGE_KEY);
   if (saved === null) return null;
   const parsed = JSON.parse(saved);
   validateScene(parsed);
+  parsed.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
+  parsed.typography.fontFamily = fontFamilyFor(parsed.typography.fontFamily);
   return cloneScene(parsed);
 }
 
@@ -34,6 +85,7 @@ function getInitialScene() {
 }
 
 const canvas = ref(null);
+const vectorCanvas = ref(null);
 const picker = ref(null);
 const exportMenu = ref(null);
 const exportButton = ref(null);
@@ -64,6 +116,8 @@ let observer = null;
 let lastTextFrameTime = 0;
 let lastScene = JSON.stringify(scene.value);
 let exportWarning = '';
+let outlineFontsReady = false;
+let outlineFontsLoading = null;
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
 const durationLabel = computed(() => formatTime(duration.value));
@@ -85,6 +139,9 @@ async function initializeRenderer() {
   await nextTick();
   if (!canvas.value || renderer.value) return;
   try {
+    await document.fonts.load(
+      `${scene.value.typography.fontWeight} 20px "${fontFamilyFor(scene.value.typography.fontFamily)}"`,
+    );
     renderer.value = createAsciiRenderer({
       canvas: canvas.value,
       scene: scene.value,
@@ -95,6 +152,7 @@ async function initializeRenderer() {
         statsLabel.value = value;
       },
     });
+    renderCurrentFrame();
     observer = new ResizeObserver(() => renderer.value?.resize());
     observer.observe(canvas.value.parentElement);
   } catch (err) {
@@ -134,6 +192,8 @@ async function importFile(file) {
       const project = await readAscii(bytes);
       asciiDocument.value = null;
       scene.value = project.scene;
+      scene.value.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
+      scene.value.typography.fontFamily = fontFamilyFor(scene.value.typography.fontFamily);
       const restored = new File([project.media], project.manifest.media.path.split('/').pop(), {
         type: project.manifest.media.mime,
       });
@@ -173,6 +233,7 @@ async function loadMedia(file) {
       mediaSize.value = { width: image.naturalWidth, height: image.naturalHeight };
       renderer.value?.setSource(image);
       if (asciiMode.value) updateAsciiText();
+      else renderCurrentFrame();
     };
     image.onerror = () => {
       error.value = 'Impossibile decodificare questa immagine.';
@@ -189,13 +250,13 @@ function onVideoReady() {
   video.value.muted = scene.value.playback.muted;
   video.value.volume = scene.value.playback.volume;
   renderer.value?.setSource(video.value);
-  renderer.value?.renderFrame();
   if (scene.value.flattenColors.enabled) {
     ensureVideoPalette().catch((cause) => {
       error.value = cause.message;
     });
   }
   if (asciiMode.value) updateAsciiText();
+  else renderCurrentFrame();
 }
 
 function updateAsciiText(isVideoFrame = false) {
@@ -222,7 +283,7 @@ function updateAsciiText(isVideoFrame = false) {
 function renderVideoFrame() {
   if (!video.value || video.value.paused || video.value.ended) return;
   if (asciiMode.value) updateAsciiText(true);
-  else renderer.value?.renderFrame();
+  else renderCurrentFrame();
   currentTime.value = video.value.currentTime;
   if ('requestVideoFrameCallback' in video.value)
     videoFrame = video.value.requestVideoFrameCallback(renderVideoFrame);
@@ -258,13 +319,13 @@ function seekVideo(event) {
   video.value.currentTime = Number(event.target.value);
   currentTime.value = video.value.currentTime;
   if (asciiMode.value) updateAsciiText();
-  else renderer.value?.renderFrame();
+  else renderCurrentFrame();
 }
 
 function onVideoEnded() {
   playing.value = false;
   if (asciiMode.value) updateAsciiText();
-  else renderer.value?.renderFrame();
+  else renderCurrentFrame();
 }
 
 function dropFile(event) {
@@ -281,6 +342,7 @@ function updateScene() {
     });
   }
   if (asciiMode.value) updateAsciiText();
+  else renderCurrentFrame();
 }
 
 async function ensureVideoPalette() {
@@ -292,12 +354,13 @@ async function ensureVideoPalette() {
   ) {
     await renderer.value?.prepareVideoPalette(video.value);
     if (asciiMode.value) updateAsciiText();
+    else renderCurrentFrame();
   }
 }
 
 watch(asciiMode, (enabled) => {
   if (enabled) updateAsciiText();
-  else renderer.value?.renderFrame();
+  else renderCurrentFrame();
 });
 
 watch(
@@ -603,12 +666,20 @@ function onKeydown(event) {
             <div class="control-row">
               <label for="font">Typeface</label
               ><select id="font" v-model="scene.typography.fontFamily">
-                <option value="monospace">System Mono</option>
-                <option value="Courier New">Courier New</option>
-                <option value="ui-monospace">UI Monospace</option>
-                <option value="serif">Serif</option>
+                <option value="IBM Plex Mono">IBM Plex Mono</option>
+                <option value="Cousine">Cousine</option>
+                <option value="Lora">Lora</option>
               </select>
             </div>
+            <label class="check-row"
+              ><input
+                v-model="scene.rendering.mode"
+                type="checkbox"
+                true-value="vector"
+                false-value="bitmap"
+              />
+              Rendering vettoriale</label
+            >
             <div class="control-row">
               <label for="charset">Character set</label
               ><select
@@ -844,7 +915,17 @@ function onKeydown(event) {
             </div>
           </div>
           <div v-else-if="mediaFile" v-show="!asciiMode" class="canvas-frame">
-            <canvas ref="canvas" aria-label="ASCII rendering preview" />
+            <canvas
+              ref="canvas"
+              aria-label="ASCII rendering preview"
+              :class="{ 'bitmap-hidden': scene.rendering.mode === 'vector' }"
+            />
+            <canvas
+              v-show="scene.rendering.mode === 'vector'"
+              ref="vectorCanvas"
+              class="vector-preview"
+              aria-label="ASCII vector rendering preview"
+            />
             <div class="canvas-label"><i /> LIVE PREVIEW</div>
           </div>
           <div
