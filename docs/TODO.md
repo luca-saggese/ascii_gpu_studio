@@ -22,6 +22,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-062 [P1] Remove the cumulative 20-million-cell export/validation cap and verify `.ascii` validation above the former threshold.
 - [x] AGPU-063 [P1] Add opt-in OpenType vector glyph rendering, bundled OFL fonts, deduplicated per-character paths in `.ascii`, and shared preview/PNG/offline-HTML path filling; verify counters, accents, punctuation, and vector export in Chromium.
 - [x] AGPU-064 [P1] Preserve bitmap preview when WebGL2 context creation is unavailable using a Canvas 2D fallback, expose the actual backend, and verify the fallback in Chromium.
+- [x] AGPU-065 [P1] Reduce CPU cost in deterministic video ASCII capture by precomputing Sobel luminance/blur and removing bilateral-filter neighbor allocations; verify output against the reference edge calculation.
 
 ## In progress
 

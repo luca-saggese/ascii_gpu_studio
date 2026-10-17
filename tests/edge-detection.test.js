@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEdgeMap } from '../src/edge-detection.js';
+import { createEdgeMap, edgeMagnitude } from '../src/edge-detection.js';
 
 function verticalStep(width, height) {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -32,5 +32,27 @@ describe('Sobel edge detection', () => {
     const crisp = createEdgeMap(data, 12, 8, { ...options, smoothing: 0 });
     const smooth = createEdgeMap(data, 12, 8, { ...options, smoothing: 2 });
     expect(Math.min(...crisp)).toBeLessThan(Math.min(...smooth));
+  });
+
+  it('matches the reference Sobel magnitude after reusing precomputed luminance', () => {
+    const width = 8;
+    const height = 7;
+    const data = verticalStep(width, height);
+    for (const smoothing of [0, 1, 3]) {
+      const actual = createEdgeMap(data, width, height, {
+        threshold: 0,
+        smoothing,
+        mode: 'edges',
+        intensity: 0.65,
+      });
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const offset = (y * width + x) * 4;
+          const expected = 1 - edgeMagnitude(data, width, height, x, y, smoothing);
+          expect(actual[y * width + x]).toBeCloseTo(expected, 6);
+          expect(data[offset + 3]).toBe(255);
+        }
+      }
+    }
   });
 });

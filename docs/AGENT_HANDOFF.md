@@ -10,6 +10,8 @@ The Studio also has **Save defaults**: it persists the full validated scene in b
 
 Bitmap preview prefers WebGL2. If browser policy, hardware, or configuration prevents context creation, it falls back to Canvas 2D using the same ASCII page renderer as exports and identifies the active backend in the preview badge. Canvas conversion is CPU-side and can be slower, especially for video/high column counts. Vector mode already uses Canvas 2D. WebGL shader/program failures are not masked by the fallback.
 
+Video `.ascii` export's 40% phase is real-time audio capture; after it completes, frames are deterministically sought and converted at 100 ms intervals. The CPU export path now precomputes edge-filter luminance/blur instead of recalculating each neighborhood repeatedly and avoids temporary neighbor arrays in the bilateral filter. Longer clips, many frames, high columns, or active filters can still take time and consume memory; no sampling or cell-count cap has been reintroduced.
+
 Flatten Colors uses bilateral smoothing and an OKLab nearest-color palette without dithering. Images derive a palette from the source; videos sample six distributed timestamps once and reuse the palette for all frames. WebGL preview uses a shared palette texture; ASCII capture stores final palette-only cell RGB and `.ascii` carries the palette/settings metadata. Combined edge detection always samples original luminance while using flattened colors as its image base.
 
 The inspector is viewport-bounded, scrolls independently from the page, and keeps its header/footer outside the scroll area. All five settings groups use native collapsible details/summary; edge mode is a select menu.

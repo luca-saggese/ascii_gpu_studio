@@ -128,9 +128,13 @@ function bilateralSmooth(image, strength) {
     for (let x = 0; x < width; x += 1) {
       const pixel = y * width + x;
       const labOffset = pixel * 3;
-      const center = [lab[labOffset], lab[labOffset + 1], lab[labOffset + 2]];
+      const centerL = lab[labOffset];
+      const centerA = lab[labOffset + 1];
+      const centerB = lab[labOffset + 2];
       let totalWeight = 0;
-      const colorTotal = [0, 0, 0];
+      let redTotal = 0;
+      let greenTotal = 0;
+      let blueTotal = 0;
       for (let dy = -radius; dy <= radius; dy += 1) {
         const sampleY = clamp(y + dy, 0, height - 1);
         for (let dx = -radius; dx <= radius; dx += 1) {
@@ -138,22 +142,23 @@ function bilateralSmooth(image, strength) {
           const samplePixel = sampleY * width + sampleX;
           const sampleOffset = samplePixel * 4;
           const sampleLabOffset = samplePixel * 3;
-          const sampleLab = [
-            lab[sampleLabOffset],
-            lab[sampleLabOffset + 1],
-            lab[sampleLabOffset + 2],
-          ];
+          const deltaL = centerL - lab[sampleLabOffset];
+          const deltaA = centerA - lab[sampleLabOffset + 1];
+          const deltaB = centerB - lab[sampleLabOffset + 2];
           const weight = Math.exp(
-            (dx * dx + dy * dy) * spatialScale + distanceSquared(center, sampleLab) * rangeScale,
+            (dx * dx + dy * dy) * spatialScale +
+              (deltaL * deltaL + deltaA * deltaA + deltaB * deltaB) * rangeScale,
           );
           totalWeight += weight;
-          for (let channel = 0; channel < 3; channel += 1)
-            colorTotal[channel] += data[sampleOffset + channel] * weight;
+          redTotal += data[sampleOffset] * weight;
+          greenTotal += data[sampleOffset + 1] * weight;
+          blueTotal += data[sampleOffset + 2] * weight;
         }
       }
       const outputOffset = pixel * 4;
-      for (let channel = 0; channel < 3; channel += 1)
-        output[outputOffset + channel] = colorTotal[channel] / totalWeight;
+      output[outputOffset] = redTotal / totalWeight;
+      output[outputOffset + 1] = greenTotal / totalWeight;
+      output[outputOffset + 2] = blueTotal / totalWeight;
     }
   }
   return output;

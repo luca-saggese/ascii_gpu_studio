@@ -576,16 +576,22 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         const offset = (sampleY * sampleWidth + sampleX) * 4;
         const alpha = pixels[offset + 3] / 255;
         if (cellColors) cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
-        let luminance = edges
-          ? Math.min(
-              ...Array.from({ length: sampleScale * sampleScale }, (_, index) => {
-                const px = x * sampleScale + (index % sampleScale);
-                const py = y * sampleScale + Math.floor(index / sampleScale);
-                return edges[py * sampleWidth + px];
-              }),
-            )
-          : (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
+        let luminance;
+        if (edges) {
+          luminance = 1;
+          for (let dy = 0; dy < sampleScale; dy += 1) {
+            for (let dx = 0; dx < sampleScale; dx += 1) {
+              luminance = Math.min(
+                luminance,
+                edges[(y * sampleScale + dy) * sampleWidth + x * sampleScale + dx],
+              );
+            }
+          }
+        } else {
+          luminance =
+            (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
             255;
+        }
         luminance = Math.max(
           0,
           Math.min(
