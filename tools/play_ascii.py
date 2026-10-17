@@ -8,6 +8,7 @@ import gzip
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,8 @@ def load_document(path):
     if len(payload) > MAX_EXPANDED_BYTES:
         raise ValueError("Il documento .ascii supera il limite decompresso di 250 MiB.")
     document = json.loads(payload.decode("utf-8"))
+    if not isinstance(document, dict):
+        raise ValueError("Formato o versione del documento .ascii non supportati.")
     if (
         document.get("format") != "ascii-gpu-studio"
         or document.get("version") != 1
@@ -54,6 +57,21 @@ def load_document(path):
         raise ValueError("Dimensioni della griglia .ascii non valide.")
 
     colors = render.get("colors", {})
+    if (
+        not isinstance(colors, dict)
+        or colors.get("mode") not in ("mono", "rgb", "bw")
+        or any(
+            not isinstance(colors.get(name), str)
+            or re.fullmatch(r"#[\da-fA-F]{6}", colors[name]) is None
+            for name in ("foreground", "background")
+        )
+    ):
+        raise ValueError("Modalità o colori non validi nel documento .ascii.")
+    if colors["mode"] == "bw" and (
+        colors["foreground"].lower() != "#ffffff"
+        or colors["background"].lower() != "#000000"
+    ):
+        raise ValueError("Modalità o colori non validi nel documento .ascii.")
     previous_timestamp = -1
     for frame in frames:
         text = frame.get("text") if isinstance(frame, dict) else None
@@ -119,29 +137,39 @@ def safe_line(line):
     )
 
 
-def crop_center(line, width):
-    """Center-crop a Unicode line to terminal display cells."""
+def crop_center_cells(line, width):
+    """Return cropped display cells paired with their source character indices."""
     visible = []
     position = 0
+    source_index = 0
     for character in safe_line(line):
         size = cell_width(character)
         if size == 0:
             if visible:
-                left, right, previous = visible[-1]
-                visible[-1] = (left, right, previous + character)
+                left, right, previous, index = visible[-1]
+                visible[-1] = (left, right, previous + character, index)
             continue
-        visible.append((position, position + size, character))
+        visible.append((position, position + size, character, source_index))
         position += size
+        source_index += 1
     start = max(0, (position - width) // 2)
     end = start + width
     cells = [" "] * (position if position <= width else width)
-    for left, right, character in visible:
+    source_indices = [None] * len(cells)
+    for left, right, character, index in visible:
         if position <= width or (left >= start and right <= end):
             target = left if position <= width else left - start
             cells[target] = character
+            source_indices[target] = index
             if right - left == 2:
                 cells[target + 1] = ""
-    return "".join(cells)
+                source_indices[target + 1] = index
+    return list(zip(cells, source_indices))
+
+
+def crop_center(line, width):
+    """Center-crop a Unicode line to terminal display cells."""
+    return "".join(character for character, _ in crop_center_cells(line, width))
 
 
 def parse_color(value):
@@ -176,14 +204,13 @@ def render_frame(document, frame_index, terminal_width, terminal_height, color=T
         line = safe_line(lines[source_y])
         line_width = sum(cell_width(char) for char in line)
         left = max(0, (terminal_width - line_width) // 2)
-        crop_start = max(0, (line_width - terminal_width) // 2)
-        cropped = crop_center(line, terminal_width)
+        cropped = crop_center_cells(line, terminal_width)
         output.append(" " * left)
-        for screen_x, glyph in enumerate(cropped):
+        for glyph, cell_x in cropped:
             if glyph == "":
                 continue
-            if color and cell_colors is not None and mode == "rgb":
-                cell_x = min(columns - 1, max(0, crop_start + screen_x))
+            if color and cell_colors is not None and mode == "rgb" and cell_x is not None:
+                cell_x = min(columns - 1, max(0, cell_x))
                 offset = (source_y * columns + cell_x) * 3
                 red, green, blue = cell_colors[offset : offset + 3]
                 output.append(f"\033[38;2;{red};{green};{blue}m")

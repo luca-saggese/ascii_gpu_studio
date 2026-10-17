@@ -3,8 +3,9 @@ import gzip
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from play_ascii import crop_center, load_document, render_frame
+from play_ascii import crop_center, load_document, render_frame, start_audio
 
 
 def sample_document():
@@ -51,9 +52,17 @@ class TerminalAsciiPlayerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Frame o tempi"):
                 load_document(file.name)
 
+    def test_rejects_non_object_json(self):
+        with tempfile.NamedTemporaryFile() as file:
+            file.write(gzip.compress(b"[]"))
+            file.flush()
+            with self.assertRaisesRegex(ValueError, "Formato o versione"):
+                load_document(file.name)
+
     def test_centers_and_crops_unicode_by_terminal_cells(self):
         self.assertEqual(crop_center("abcdef", 4), "bcde")
         self.assertEqual(crop_center("界a界", 3), " a ")
+        self.assertEqual(crop_center("界a", 4), "界a")
 
     def test_centers_frame_and_uses_cell_rgb(self):
         with tempfile.NamedTemporaryFile() as file:
@@ -64,6 +73,20 @@ class TerminalAsciiPlayerTests(unittest.TestCase):
         self.assertIn("\033[38;2;0;1;2mA", output)
         self.assertIn("\033[38;2;9;10;11mD", output)
         self.assertIn("\033[2J\033[H", output)
+
+    def test_applies_positive_audio_offset_in_ffplay_filter(self):
+        with tempfile.NamedTemporaryFile() as file, patch(
+            "play_ascii.subprocess.Popen"
+        ) as popen:
+            start_audio(
+                {"_decoded": b"audio bytes", "offsetMs": 250},
+                "/usr/bin/ffplay",
+                file.name,
+            )
+            command = popen.call_args.args[0]
+            self.assertEqual(command[command.index("-af") + 1], "adelay=250:all=1")
+            with open(file.name, "rb") as audio_file:
+                self.assertEqual(audio_file.read(), b"audio bytes")
 
 
 if __name__ == "__main__":
