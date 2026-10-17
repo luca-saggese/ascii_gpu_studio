@@ -2,7 +2,6 @@ import { serializeAsciiDocument } from './ascii-document.js';
 
 const FRAME_INTERVAL_MS = 100;
 const MAX_EXPORT_FRAMES = 18000;
-const MAX_EXPORTED_CELLS = 20_000_000;
 
 function bytesToBase64(bytes) {
   let binary = '';
@@ -52,8 +51,10 @@ async function captureAudio(video, signal, onProgress) {
     stream.getTracks().forEach((track) => track.stop());
     return null;
   }
-  if (typeof MediaRecorder === 'undefined')
+  if (typeof MediaRecorder === 'undefined') {
+    stream.getTracks().forEach((track) => track.stop());
     throw new Error('MediaRecorder non disponibile: non posso incorporare l’audio nel file ASCII.');
+  }
   const mimeType = ['audio/webm;codecs=opus', 'audio/webm'].find((type) =>
     MediaRecorder.isTypeSupported(type),
   );
@@ -198,6 +199,7 @@ export async function captureAsciiDocument({
   video = null,
   signal,
   onProgress = () => {},
+  onWarning = () => {},
 }) {
   if (signal?.aborted) throw new DOMException('Esportazione annullata.', 'AbortError');
   if (kind === 'image') {
@@ -217,15 +219,16 @@ export async function captureAsciiDocument({
   const frameCount = Math.ceil((video.duration * 1000) / FRAME_INTERVAL_MS);
   if (frameCount > MAX_EXPORT_FRAMES)
     throw new Error('Il video supera il limite di 30 minuti per la conversione ASCII.');
-  const { columns, rows } = renderer.getStats();
-  if (columns * rows * frameCount > MAX_EXPORTED_CELLS)
-    throw new Error(
-      'La sequenza supera il limite di 20 milioni di celle esportate. Riduci le colonne o usa un video più breve.',
-    );
   const wasPlaying = !video.paused;
   const previousTime = video.currentTime;
   try {
-    const audio = await captureAudio(video, signal, onProgress);
+    let audio = null;
+    try {
+      audio = await captureAudio(video, signal, onProgress);
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      onWarning(`Audio non incluso: ${error.message} L’esportazione ASCII prosegue senza audio.`);
+    }
     await waitForSeek(video, 0, signal);
     const firstCapture = renderer.captureText();
     const firstFrame = capturePage(

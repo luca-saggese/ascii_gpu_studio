@@ -6,7 +6,7 @@ Latest verified implementation commit: `e835d84` (`fix(renderer): sample complet
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (12 tests) all pass. The PNG worker issue after importing a gzip `.ascii` document was fixed by posting plain data rather than Vue reactive proxies.
+Latest verification: `pnpm lint`, `pnpm test` (13 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (13 tests) all pass. Video ASCII export now continues without audio if the browser cannot capture it, and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
@@ -20,6 +20,8 @@ Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm fo
 - Settings live in a fixed-height inspector with its own scroll region. Source, Typography, Appearance, Edge Detection, and Flatten Colors groups are collapsible; Edge Detection mode uses a select with Solo bordi and Bordi + immagine options.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM audio, and compact per-cell RGB. Legacy ZIP projects remain importable.
+- Video export no longer applies a cumulative 20-million-cell ceiling. The existing 30-minute duration cap and browser memory/`.ascii` size constraints still apply.
+- If audio capture is unavailable or fails, video ASCII frame export continues without audio and notifies the user; cancellation still aborts the export.
 - A single keyboard-accessible Export dropdown offers ASCII, contextual PNG/MP4, and standalone offline HTML. It supports Escape/outside click and reports cancellable progress for video conversion.
 - PNG rasterizes the ASCII document at configured cell resolution in an OffscreenCanvas worker when available; the same drawing function is embedded in the offline HTML player.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.

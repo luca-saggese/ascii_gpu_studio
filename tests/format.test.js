@@ -3,7 +3,11 @@ import { File } from 'node:buffer';
 import { gunzipSync, strFromU8, strToU8, zipSync } from 'fflate';
 import { DEFAULT_SCENE } from '../src/core.js';
 import { exportAscii, readAscii } from '../src/format.js';
-import { deserializeAsciiDocument, serializeAsciiDocument } from '../src/ascii-document.js';
+import {
+  deserializeAsciiDocument,
+  serializeAsciiDocument,
+  validateAsciiDocument,
+} from '../src/ascii-document.js';
 import { createPlayableHtml } from '../src/templates/playable-template.js';
 
 describe('.ascii project format', () => {
@@ -63,6 +67,23 @@ describe('.ascii project format', () => {
           frames: [...sample.frames, sample.frames[0]],
         }),
       ).rejects.toThrow(/immagine/);
+    });
+
+    it('accepts frame data above the former cumulative cell ceiling', () => {
+      const columns = 20_000_001;
+      const large = {
+        ...sample,
+        render: {
+          ...sample.render,
+          columns,
+          cellWidth: 1,
+          cellHeight: 1,
+          width: columns,
+          height: 1,
+        },
+        frames: [{ timestampMs: 0, durationMs: 0, text: 'x'.repeat(columns) }],
+      };
+      expect(validateAsciiDocument(large)).toBe(large);
     });
   });
 

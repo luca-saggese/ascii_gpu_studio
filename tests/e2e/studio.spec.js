@@ -419,6 +419,26 @@ test('keeps one globally sampled palette across video frames', async ({ page }) 
   }
 });
 
+test('exports video frames without audio when browser capture is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLMediaElement.prototype, 'captureStream', {
+      configurable: true,
+      value: undefined,
+    });
+  });
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/motion-with-audio.webm');
+  await expect(page.locator('video.media-source')).toHaveJSProperty('videoWidth', 320);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const file = await download;
+  const exported = JSON.parse(strFromU8(gunzipSync(await readFile(await file.path()))));
+  expect(exported.contentType).toBe('video');
+  expect(exported).not.toHaveProperty('audio');
+  await expect(page.locator('.toast')).toContainText('L’esportazione ASCII prosegue senza audio');
+});
+
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {
   await page.goto('/');
   const malformedArchive = zipSync({

@@ -4,7 +4,15 @@ const FORMAT = 'ascii-gpu-studio';
 const VERSION = 1;
 const MAX_COMPRESSED_BYTES = 110 * 1024 * 1024;
 const MAX_EXPANDED_BYTES = 250 * 1024 * 1024;
-const MAX_TOTAL_CELLS = 20_000_000;
+
+function codePointLength(value) {
+  let count = value.length;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff && value.charCodeAt(index + 1) >= 0xdc00) count -= 1;
+  }
+  return count;
+}
 
 async function compress(bytes) {
   if (typeof CompressionStream === 'undefined') return gzipSync(bytes);
@@ -85,11 +93,9 @@ function validateAsciiDocument(document) {
   if (document.contentType === 'image' && (document.frames.length !== 1 || document.audio))
     throw new Error('Un documento immagine deve contenere una sola pagina e nessun audio.');
   const { columns, rows, width, height, cellWidth, cellHeight, font, colors } = document.render;
-  let totalCells = 0;
   let previousTimestamp = -1;
   const invalidFrame = document.frames.some((frame) => {
     const lines = typeof frame?.text === 'string' ? frame.text.split('\n') : [];
-    totalCells += columns * rows;
     let invalidColor = false;
     if (frame?.colors !== undefined && frame.colors !== null) {
       try {
@@ -110,7 +116,7 @@ function validateAsciiDocument(document) {
     previousTimestamp = frame?.timestampMs;
     return (
       lines.length !== rows ||
-      lines.some((line) => Array.from(line).length !== columns) ||
+      lines.some((line) => codePointLength(line) !== columns) ||
       invalidColor ||
       invalidTiming
     );
@@ -131,8 +137,7 @@ function validateAsciiDocument(document) {
     !['mono', 'rgb'].includes(colors.mode) ||
     !/^#[\da-f]{6}$/i.test(colors.foreground) ||
     !/^#[\da-f]{6}$/i.test(colors.background) ||
-    invalidFrame ||
-    totalCells > MAX_TOTAL_CELLS
+    invalidFrame
   ) {
     throw new Error('Dimensioni o pagine del documento ASCII non valide.');
   }

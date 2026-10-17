@@ -63,6 +63,7 @@ let videoFrame = null;
 let observer = null;
 let lastTextFrameTime = 0;
 let lastScene = JSON.stringify(scene.value);
+let exportWarning = '';
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
 const durationLabel = computed(() => formatTime(duration.value));
@@ -333,6 +334,9 @@ async function buildExportDocument() {
       onProgress: (progress) => {
         exportProgress.value = Math.min(100, Math.round(progress * 100));
       },
+      onWarning: (warning) => {
+        exportWarning = warning;
+      },
     });
   } finally {
     exportAbort.value = null;
@@ -345,6 +349,7 @@ async function performExport(kind) {
   exportMenuOpen.value = false;
   busy.value = true;
   exportProgress.value = 0;
+  exportWarning = '';
   error.value = '';
   try {
     if (kind === 'mp4') {
@@ -360,7 +365,7 @@ async function performExport(kind) {
     } else if (kind === 'html') {
       download(await createPlayableHtml(model), `${exportBaseName()}-playable.html`);
     }
-    notify('Export completato');
+    notify(exportWarning || 'Export completato');
   } catch (err) {
     if (err.name !== 'AbortError') error.value = err.message;
     else notify('Esportazione annullata');
