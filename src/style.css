@@ -201,6 +201,27 @@ select:focus-visible {
   color: var(--teal);
   font: 11px var(--mono);
 }
+
+.edge-section .segmented-control {
+  margin-top: 12px;
+}
+
+.edge-threshold {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  align-items: center;
+  gap: 10px;
+}
+
+.edge-threshold input[type='number'] {
+  width: 100%;
+  border: 1px solid var(--line, #26332f);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: inherit;
+  background: var(--panel, #101715);
+  font: inherit;
+}
 .icon-button {
   border: 0;
   background: transparent;

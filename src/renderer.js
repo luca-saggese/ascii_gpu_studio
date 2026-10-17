@@ -1,4 +1,5 @@
-import { coverageOrder, gridForSource, validateScene } from './core.js';
+import { coverageOrder, DEFAULT_SCENE, gridForSource, validateScene } from './core.js';
+import { createEdgeMap } from './edge-detection.js';
 
 const vertex = `#version 300 es
 in vec2 position;
@@ -22,10 +23,37 @@ uniform float contrast;
 uniform float gammaValue;
 uniform float invertValue;
 uniform float rgbMode;
+uniform float edgeEnabled;
+uniform float edgeThreshold;
+uniform float edgeSmoothing;
+uniform float edgeMode;
+uniform float edgeIntensity;
 uniform vec3 foreground;
 uniform vec3 background;
 uniform float fitMode;
 float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+float blurredLum(vec2 point){
+  if(edgeSmoothing<.5) return lum(texture(sourceTex,clamp(point,vec2(0.),vec2(1.))).rgb);
+  float spread=edgeSmoothing*.5;
+  float sum=0.;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){
+    float weight=(x==0?2.:1.)*(y==0?2.:1.);
+    vec2 offset=vec2(float(x),float(y))*spread/sourceSize;
+    sum+=lum(texture(sourceTex,clamp(point+offset,vec2(0.),vec2(1.))).rgb)*weight;
+  }
+  return sum/16.;
+}
+float edgeMagnitude(vec2 point,vec2 edgeStep){
+  float samples[9];
+  int index=0;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){
+    samples[index]=blurredLum(point+vec2(float(x),float(y))*edgeStep);
+    index++;
+  }
+  float gx=-samples[0]+samples[2]-2.*samples[3]+2.*samples[5]-samples[6]+samples[8];
+  float gy=-samples[0]-2.*samples[1]-samples[2]+samples[6]+2.*samples[7]+samples[8];
+  return min(1.,length(vec2(gx,gy))/5.65685425);
+}
 void main(){
   vec2 cell=floor(uv*gridSize);
   vec2 inCell=fract(uv*gridSize);
@@ -39,7 +67,13 @@ void main(){
     vec2 offset=(vec2(float(x),float(y))-1.)/gridSize/3.;
     avg+=texture(sourceTex,clamp(sampleUv+offset,vec2(0.),vec2(1.))).rgb/9.;
   }
-  float value=clamp((lum(avg)-.5)*contrast+.5+brightness,0.,1.);
+  float luminance=lum(avg);
+  if(edgeEnabled>.5){
+    float edge=edgeMagnitude(sampleUv,1./gridSize/scale);
+    edge=edge>=edgeThreshold ? edge : 0.;
+    luminance=edgeMode<.5 ? 1.-edge : luminance*(1.-edge*edgeIntensity);
+  }
+  float value=clamp((luminance-.5)*contrast+.5+brightness,0.,1.);
   value=pow(value,1./max(gammaValue,.05));
   value=mix(value,1.-value,invertValue);
   float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
@@ -104,6 +138,11 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       'gammaValue',
       'invertValue',
       'rgbMode',
+      'edgeEnabled',
+      'edgeThreshold',
+      'edgeSmoothing',
+      'edgeMode',
+      'edgeIntensity',
       'foreground',
       'background',
       'fitMode',
@@ -235,6 +274,12 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('gammaValue', currentScene.appearance.gamma);
     setUniforms('invertValue', currentScene.appearance.invert ? 1 : 0);
     setUniforms('rgbMode', currentScene.appearance.mode === 'rgb' ? 1 : 0);
+    currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
+    setUniforms('edgeEnabled', currentScene.edgeDetection.enabled ? 1 : 0);
+    setUniforms('edgeThreshold', currentScene.edgeDetection.threshold / 255);
+    setUniforms('edgeSmoothing', currentScene.edgeDetection.smoothing);
+    setUniforms('edgeMode', currentScene.edgeDetection.mode === 'edges' ? 0 : 1);
+    setUniforms('edgeIntensity', currentScene.edgeDetection.intensity);
     setUniforms('foreground', ...color(currentScene.appearance.foreground));
     setUniforms('background', ...color(currentScene.appearance.background));
     setUniforms(
@@ -284,39 +329,55 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns)),
     );
     if (!textCanvas) textCanvas = document.createElement('canvas');
-    textCanvas.width = grid.columns;
-    textCanvas.height = grid.rows;
+    const sampleScale = currentScene.edgeDetection?.enabled ? 2 : 1;
+    const sampleWidth = grid.columns * sampleScale;
+    const sampleHeight = grid.rows * sampleScale;
+    textCanvas.width = sampleWidth;
+    textCanvas.height = sampleHeight;
     const context = textCanvas.getContext('2d', { willReadFrequently: true });
     const fit = currentScene.appearance.fit;
     if (fit === 'stretch') {
-      context.drawImage(source, 0, 0, grid.columns, grid.rows);
+      context.drawImage(source, 0, 0, sampleWidth, sampleHeight);
     } else {
       const scale =
         fit === 'cover'
-          ? Math.max(grid.columns / width, grid.rows / height)
-          : Math.min(grid.columns / width, grid.rows / height);
+          ? Math.max(sampleWidth / width, sampleHeight / height)
+          : Math.min(sampleWidth / width, sampleHeight / height);
       const drawWidth = width * scale;
       const drawHeight = height * scale;
       context.drawImage(
         source,
-        (grid.columns - drawWidth) / 2,
-        (grid.rows - drawHeight) / 2,
+        (sampleWidth - drawWidth) / 2,
+        (sampleHeight - drawHeight) / 2,
         drawWidth,
         drawHeight,
       );
     }
-    const pixels = context.getImageData(0, 0, grid.columns, grid.rows).data;
+    const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+    const edges =
+      sampleScale > 1
+        ? createEdgeMap(pixels, sampleWidth, sampleHeight, currentScene.edgeDetection)
+        : null;
     const glyphs = atlas.chars;
     let text = '';
     const cellColors = currentScene.appearance.mode === 'rgb' ? [] : null;
     for (let y = 0; y < grid.rows; y += 1) {
       for (let x = 0; x < grid.columns; x += 1) {
-        const offset = (y * grid.columns + x) * 4;
+        const sampleX = x * sampleScale + Math.floor(sampleScale / 2);
+        const sampleY = y * sampleScale + Math.floor(sampleScale / 2);
+        const offset = (sampleY * sampleWidth + sampleX) * 4;
         const alpha = pixels[offset + 3] / 255;
         if (cellColors) cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
-        let luminance =
-          (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
-          255;
+        let luminance = edges
+          ? Math.min(
+              ...Array.from({ length: sampleScale * sampleScale }, (_, index) => {
+                const px = x * sampleScale + (index % sampleScale);
+                const py = y * sampleScale + Math.floor(index / sampleScale);
+                return edges[py * sampleWidth + px];
+              }),
+            )
+          : (pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722) /
+            255;
         luminance = Math.max(
           0,
           Math.min(
@@ -358,6 +419,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       validateScene(value);
       const before = JSON.stringify(currentScene.typography);
       currentScene = cloneScene(value);
+      currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
       if (before !== JSON.stringify(currentScene.typography)) makeAtlas();
       renderFrame();
     },

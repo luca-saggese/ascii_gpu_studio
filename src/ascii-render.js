@@ -71,8 +71,8 @@ export function renderAsciiPng(asciiDocument, signal) {
         reject(new Error('Worker di rendering PNG non disponibile.'));
       };
       worker.postMessage({
-        page: asciiDocument.frames[0],
-        render: asciiDocument.render,
+        page: JSON.parse(JSON.stringify(asciiDocument.frames[0])),
+        render: JSON.parse(JSON.stringify(asciiDocument.render)),
       });
     });
   }

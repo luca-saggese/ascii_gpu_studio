@@ -217,6 +217,7 @@ test('maps dark image cells to denser glyphs than bright image cells', async ({ 
     context.fillRect(160, 0, 160, 160);
     return source.toDataURL('image/png').split(',')[1];
   });
+
   await page.locator('input[type=file]').setInputFiles({
     name: 'black-white.png',
     mimeType: 'image/png',
@@ -250,6 +251,50 @@ test('maps dark image cells to denser glyphs than bright image cells', async ({ 
     return halves;
   });
   expect(coverage[0]).toBeGreaterThan(coverage[1] + 0.2);
+});
+
+test('applies Sobel edge detection live and stores its settings with converted pages', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 24;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, 16, 24);
+    context.fillStyle = '#fff';
+    context.fillRect(16, 0, 16, 24);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'edge-test.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  const original = await canvas.evaluate((element) => element.toDataURL());
+  await page.getByLabel('Enable edge detection').check();
+  await expect(page.getByLabel('Threshold value')).toHaveValue('56');
+  await page.getByLabel('Threshold value').fill('12');
+  await expect.poll(() => canvas.evaluate((element) => element.toDataURL())).not.toBe(original);
+  await page.getByRole('button', { name: 'Bordi + immagine' }).click();
+  await expect(page.getByLabel('Intensità bordi')).toBeVisible();
+  await page.getByLabel('Intensità bordi').fill('0.9');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const bytes = await readFile(await (await download).path());
+  const exported = JSON.parse(strFromU8(gunzipSync(bytes)));
+  expect(exported.filters.edgeDetection).toEqual({
+    enabled: true,
+    threshold: 12,
+    smoothing: 0,
+    mode: 'image',
+    intensity: 0.9,
+  });
+  expect(exported.frames[0].text).toMatch(/\S/);
 });
 
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {

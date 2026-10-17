@@ -15,6 +15,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-040 [P0] Reject ZIP traversal and drive-absolute paths during bounded streaming extraction — unit/E2E cover path rejection; `06410a5`.
 - [x] AGPU-014 [P1] Remove user font-size control and improve raster detail — fixed internal 20 px glyph size, 4×–8× GPU-aware atlas scale, and 32–320 column control; covered by Chromium E2E.
 - [x] AGPU-056 [P1] Add shared gzip-JSON ASCII result format, deterministic frame sampling, optional audio capture, PNG export, standalone offline HTML player, and accessible export dropdown; browser coverage includes image color and video with/without audio.
+- [x] AGPU-058 [P1] Add fixed-scale Sobel Edge Detection with configurable smoothing, threshold, solo-edge/image blend modes, live WebGL preview, 2× grid ASCII conversion, and `.ascii` filter metadata; lint, unit, build, format, and Chromium E2E pass.
 
 ## In progress
 
@@ -28,7 +29,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [ ] AGPU-033 [P0] Make Vue SDK self-contained/publishable and test consumer install from an external project.
 - [ ] AGPU-042 [P0] Add tested WebGL context loss/restoration and a user-visible recovery path.
 - [ ] AGPU-051 [P0] Add CI workflow, browser installation/cache, npm/license audit, and accessibility review.
-- [ ] AGPU-052 [P1] Add edge-aware selection, temporal hysteresis, golden quality comparisons, and measured FPS benchmarks.
+- [ ] AGPU-052 [P1] Add temporal hysteresis, golden quality comparisons, and measured FPS benchmarks for edge-aware conversion.
 - [ ] AGPU-053 [P1] Add custom charset entry, preset library, undo/redo, custom font handling, TXT/SVG export.
 - [ ] AGPU-054 [P1] Add React and Web Component wrappers.
 - [ ] AGPU-055 [P2] Evaluate adaptive quality, GIF animation, webcam, and WebM recording with verified audio.

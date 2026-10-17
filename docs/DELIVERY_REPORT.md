@@ -8,18 +8,19 @@
 - PNG uses the ASCII page model and configured cell/font/color dimensions, not the source raster or Studio UI. It renders through OffscreenCanvas in a worker where available.
 - HTML playable is a single offline `.html`: it embeds the compressed `.ascii` bytes as Base64, includes a self-contained player and the same page renderer, and has play/pause, seek, clock, volume, mute, and fullscreen controls. With audio it follows the audio clock; without audio it uses a monotonic clock. ASCII data is passed to `fillText`, never `innerHTML`.
 - Old ZIP `.ascii` projects still import. New `.ascii` exports do not contain their original image/video or thumbnails.
+- Edge Detection is available before conversion: fixed-scale Sobel over luminance, configurable threshold and Gaussian smoothing, Solo bordi and Bordi + immagine modes, adjustable blend intensity, and preserved source colors in RGB mode. The live preview evaluates it in WebGL2. ASCII capture oversamples at 2× grid resolution; exported frame pages are already filtered, and `.ascii` stores the chosen settings as metadata for inspection only.
 
 ## Verified
 
-| Check               | Result            |
-| ------------------- | ----------------- |
-| `pnpm lint`         | Pending final run |
-| `pnpm test`         | Pending final run |
-| `pnpm build`        | Pending final run |
-| `pnpm format:check` | Pending final run |
-| `pnpm test:e2e`     | Pending final run |
+| Check               | Result                    |
+| ------------------- | ------------------------- |
+| `pnpm lint`         | Passed                    |
+| `pnpm test`         | Passed — 10 tests         |
+| `pnpm build`        | Passed                    |
+| `pnpm format:check` | Passed                    |
+| `pnpm test:e2e`     | Passed — 8 Chromium tests |
 
-E2E now covers image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
+E2E covers live Edge Detection preview and metadata, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
 
 ## MP4 limitation — explicit
 

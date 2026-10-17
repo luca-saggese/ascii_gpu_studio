@@ -9,6 +9,15 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
   "format": "ascii-gpu-studio",
   "version": 1,
   "contentType": "image",
+  "filters": {
+    "edgeDetection": {
+      "enabled": false,
+      "threshold": 56,
+      "smoothing": 0,
+      "mode": "edges",
+      "intensity": 0.65
+    }
+  },
   "render": {
     "columns": 96,
     "rows": 54,
@@ -46,6 +55,8 @@ An image has exactly one page and no audio. Video pages are complete frames samp
 Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. The current browser capture path records the source audio track as WebM/Opus and embeds those bytes. `offsetMs` is relative to the ASCII frame timeline. HTML playback uses the audio clock when audio is present and a monotonic clock otherwise.
 
 The serialization and validation boundary lives in `src/ascii-document.js`; image/video frame capture is in `src/ascii-export.js`. Full-frame pages are used in v1 so a future version can introduce delta frames or chunk compression behind the same reader/player boundary.
+
+`filters.edgeDetection` records the settings used to make the pages. The pages already contain the filtered ASCII result; readers and the offline HTML player display them directly and do not rerun edge detection.
 
 ## Legacy import
 

@@ -4,7 +4,7 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
-The single export menu and gzip JSON ASCII document are implemented. It includes deterministic 100 ms video seeking, optional source-audio capture, worker-rendered PNG, and a self-contained offline HTML player. The MP4 option reports unsupported in this Chromium rather than using real-time recording. Latest lint, unit tests, build, and format checks pass. The complete E2E run has one reproducible failure: after importing the exported `.ascii` image document, the PNG export never dispatches a download (60-second focused timeout).
+The single export menu and gzip JSON ASCII document are implemented. It includes deterministic 100 ms video seeking, optional source-audio capture, worker-rendered PNG, and a self-contained offline HTML player. The MP4 option reports unsupported in this Chromium rather than using real-time recording. Edge Detection is implemented in the WebGL2 preview and shared ASCII capture path, with fixed-scale Sobel, optional Gaussian smoothing, modes, threshold, and intensity metadata. PNG and HTML show converted pages without recalculating the filter. Latest `pnpm lint`, `pnpm test` (10), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (8) pass. The PNG-after-import E2E issue was resolved by copying reactive Vue data into plain objects before posting to the worker.
 
 ## First files to read
 
@@ -34,8 +34,8 @@ pnpm test:e2e
 
 ## Current gaps
 
-No WebGL context restoration/fallback, audio acoustic assertion, other-browser E2E, edge-aware algorithm, custom charset editor, undo/redo, TXT/SVG, WebM exporter, or release CI. Vue package currently references shared source outside its package root and is not independently publishable.
+No WebGL context restoration/fallback, audio acoustic assertion, other-browser E2E, temporal hysteresis, custom charset editor, undo/redo, TXT/SVG, WebM exporter, or release CI. Vue package currently references shared source outside its package root and is not independently publishable.
 
 ## Resume
 
-Do not describe MP4 generation as implemented: this environment lacks WebCodecs and no MP4 muxer is bundled. Diagnose and fix the PNG worker/export hang after `.ascii` import before claiming the export workflow passes. Do not describe M6 as complete until the E2E issue and outstanding security, cross-browser, accessibility, and release checks are evidenced.
+Do not describe MP4 generation as implemented: this environment lacks WebCodecs and no MP4 muxer is bundled. Do not describe M6 as complete until outstanding security, cross-browser, accessibility, and release checks are evidenced.

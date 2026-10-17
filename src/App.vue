@@ -621,6 +621,77 @@ function onKeydown(event) {
             ><input v-model="scene.appearance.invert" type="checkbox" /> Invert luminance</label
           >
         </section>
+        <section class="inspector-section edge-section">
+          <div class="section-title">
+            <span class="section-icon">⌁</span>
+            <h2>Edge Detection</h2>
+          </div>
+          <label class="check-row">
+            <input v-model="scene.edgeDetection.enabled" type="checkbox" /> Enable edge detection
+          </label>
+          <template v-if="scene.edgeDetection.enabled">
+            <label class="field-label" for="edge-threshold"
+              >Threshold <output>{{ scene.edgeDetection.threshold }}</output></label
+            >
+            <div class="edge-threshold">
+              <input
+                id="edge-threshold"
+                v-model.number="scene.edgeDetection.threshold"
+                type="range"
+                min="0"
+                max="255"
+                step="1"
+              />
+              <input
+                v-model.number="scene.edgeDetection.threshold"
+                aria-label="Threshold value"
+                type="number"
+                min="0"
+                max="255"
+                step="1"
+              />
+            </div>
+            <label class="field-label" for="edge-smoothing"
+              >Smoothing <output>{{ scene.edgeDetection.smoothing || 'Off' }}</output></label
+            >
+            <input
+              id="edge-smoothing"
+              v-model.number="scene.edgeDetection.smoothing"
+              type="range"
+              min="0"
+              max="3"
+              step="1"
+            />
+            <div class="segmented-control" aria-label="Edge display mode">
+              <button
+                :class="{ selected: scene.edgeDetection.mode === 'edges' }"
+                @click="scene.edgeDetection.mode = 'edges'"
+              >
+                Solo bordi
+              </button>
+              <button
+                :class="{ selected: scene.edgeDetection.mode === 'image' }"
+                @click="scene.edgeDetection.mode = 'image'"
+              >
+                Bordi + immagine
+              </button>
+            </div>
+            <template v-if="scene.edgeDetection.mode === 'image'">
+              <label class="field-label" for="edge-intensity"
+                >Intensità bordi
+                <output>{{ scene.edgeDetection.intensity.toFixed(2) }}</output></label
+              >
+              <input
+                id="edge-intensity"
+                v-model.number="scene.edgeDetection.intensity"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+              />
+            </template>
+          </template>
+        </section>
         <div class="sidebar-footer">
           <span class="privacy-icon">◈</span
           ><span

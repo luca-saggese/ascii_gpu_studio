@@ -143,6 +143,19 @@ function createDocument({ kind, scene, firstPage, audio }) {
     format: 'ascii-gpu-studio',
     version: 1,
     contentType: kind,
+    filters: {
+      edgeDetection: JSON.parse(
+        JSON.stringify(
+          scene.edgeDetection ?? {
+            enabled: false,
+            threshold: 56,
+            smoothing: 0,
+            mode: 'edges',
+            intensity: 0.65,
+          },
+        ),
+      ),
+    },
     render: {
       columns,
       rows,
