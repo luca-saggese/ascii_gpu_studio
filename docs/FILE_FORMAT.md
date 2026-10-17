@@ -25,19 +25,23 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
     }
   },
   "render": {
-    "columns": 96,
-    "rows": 54,
-    "cellWidth": 14,
-    "cellHeight": 24,
-    "width": 1344,
-    "height": 1296,
-    "cellAspect": 0.5833,
+    "columns": 102,
+    "rows": 36,
+    "cellWidth": 10,
+    "cellHeight": 16,
+    "width": 1020,
+    "height": 576,
+    "cellAspect": 0.625,
+    "source": { "width": 1920, "height": 1080 },
+    "target": { "width": 1024, "height": 576 },
     "font": {
       "family": "IBM Plex Mono",
-      "size": 20,
+      "size": 16,
       "weight": 500,
-      "ascent": 15,
-      "descent": 4
+      "lineHeight": 1,
+      "ascent": 12,
+      "descent": 3,
+      "baseline": 12.5
     },
     "mode": "bitmap",
     "colors": {
@@ -59,7 +63,9 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
 
 An image has exactly one page and no audio. Video pages are complete frames sampled at 100 ms intervals; each frame records its timestamp and display duration. In source-color mode, a page can also store `colors`: Base64-encoded RGB bytes, three bytes per cell in row-major order. This compact binary field is for cell colors only; frame text stays directly in JSON.
 
+
 Black-and-white rendering uses `render.colors.mode: "bw"` with white foreground and black background. Its pages omit per-cell RGB data and use only the lightest and densest charset glyphs after luminance thresholding.
+
 
 Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. For `.ascii` export, the browser records the source audio track in a supported audio-only container (normally WebM/Opus in Chromium or MP4/AAC in Safari) and embeds those bytes. `offsetMs` is relative to the ASCII frame timeline. HTML playback uses the audio clock when audio is present and a monotonic clock otherwise. MP4 export from a loaded source video demuxes audio directly from the original local file; MP4 export from an imported `.ascii` document decodes its embedded audio. Both paths encode the audio as AAC.
 
@@ -90,7 +96,7 @@ Bitmap rendering remains the default. Vector documents set `render.mode` to `"ve
 
 `glyphs` is a document-wide map keyed by Unicode code point; each outline is shared by every occurrence and video page. Paths retain the parsed font curves in font units, including multiple contours. Readers fill paths with the even-odd rule, without stroke. Only characters actually present in the pages are included. No font atlas, raster glyph, source font binary, or original media is embedded in this mode. Family, weight, font size, cell metrics, foreground/background and per-cell colors remain part of `render`. `render.font.license` records the bundled font's SIL OFL 1.1 designation and copyright attribution alongside the derived paths.
 
-The Studio bundles IBM Plex Mono, Cousine, and Lora under the SIL Open Font License 1.1 to make font selection and offline vector playback deterministic. Their notices are included in `public/licenses/`. The standalone HTML requires no installed font, CDN, or network request when `render.mode` is `"vector"`; it uses the embedded paths and the same `Path2D` even-odd fill used by PNG.
+New Studio conversion uses the bundled monospaced IBM Plex Mono and Cousine families under SIL Open Font License 1.1. Lora assets are retained for compatibility with existing documents. Font notices are included in `public/licenses/`. The standalone HTML requires no installed font, CDN, or network request when `render.mode` is `"vector"`; it uses the embedded paths and the same `Path2D` even-odd fill used by PNG.
 
 ## Legacy import
 

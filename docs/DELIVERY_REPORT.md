@@ -12,17 +12,18 @@
 - Edge Detection is available before conversion: fixed-scale Sobel over luminance, configurable threshold and Gaussian smoothing, Solo bordi and Bordi + immagine modes, adjustable blend intensity, and preserved source colors in RGB mode. The live preview evaluates it in WebGL2. ASCII capture oversamples at 2× grid resolution; exported frame pages are already filtered, and `.ascii` stores the chosen settings as metadata for inspection only.
 - Save defaults persists the complete validated scene locally; Studio startup and Reset settings restore it. Storage or invalid-data errors are surfaced instead of silently ignored.
 - Flatten Colors uses bilateral smoothing and OKLab palette assignment (2–64 colors, default 16), with no dithering. A video palette is sampled from six distributed timestamps and held for the clip. Preview and ASCII capture use the same fixed palette; in RGB mode final cell colors are palette entries, saved alongside palette/settings metadata so offline HTML does not recalculate the filter.
-- **Rendering vettoriale** is an opt-in scene setting; bitmap remains the default. The Studio parses outlines from bundled IBM Plex Mono, Cousine, or Lora OpenType/WOFF fonts, caches paths by family/weight/glyph/precision, and fills contours without stroke using the even-odd rule. Preview does not use the bitmap glyph atlas in vector mode. Version 1 `.ascii` stores each used outline once across all pages; PNG and offline HTML render that geometry directly and embed no glyph raster/font dependency. Font license notices are included in `public/licenses/`.
+- **Rendering vettoriale** is an opt-in scene setting; bitmap remains the default. New Studio output uses bundled monospaced IBM Plex Mono and Cousine OpenType/WOFF fonts, caches paths by family/weight/glyph/precision, and fills contours without stroke using the even-odd rule. Preview does not use the bitmap glyph atlas in vector mode. Version 1 `.ascii` stores each used outline once across all pages; PNG and offline HTML render that geometry directly and embed no glyph raster/font dependency. Font license notices are included in `public/licenses/`.
+- Bitmap, vector, CPU fallback, ASCII capture, PNG, MP4, and the offline player share source-aware integer cell dimensions. The content target is contain-fitted within 1024 × 576; exports store the logical dimensions, complete grid, cell metrics and baseline. MP4 pads odd dimensions only along its right/bottom coded edges. Resizing the preview or entering player fullscreen never changes the grid.
 
 ## Verified
 
 | Check               | Result                     |
 | ------------------- | -------------------------- |
 | `pnpm lint`         | Passed                     |
-| `pnpm test`         | Passed — 15 tests          |
+| `pnpm test`         | Passed — 16 tests          |
 | `pnpm build`        | Passed                     |
 | `pnpm format:check` | Passed                     |
-| `pnpm test:e2e`     | Passed — 16 Chromium tests |
+| `pnpm test:e2e`     | Passed — 17 Chromium tests |
 
 E2E additionally verifies vector preview and export, accented characters/punctuation, and that the `O` counter remains empty under even-odd path filling. It covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, video frame export when audio capture is unavailable, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, MP4 playback with H.264/AAC tracks and MP4 playback without audio.
 

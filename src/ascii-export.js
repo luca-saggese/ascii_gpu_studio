@@ -143,7 +143,22 @@ function capturePage(capture, timestampMs, durationMs) {
 }
 
 function createDocument({ kind, scene, firstPage, audio }) {
-  const { columns, rows, cellWidth, cellHeight, fontSize, ascent, descent } = firstPage.capture;
+  const {
+    columns,
+    rows,
+    cellWidth,
+    cellHeight,
+    outputWidth,
+    outputHeight,
+    sourceWidth,
+    sourceHeight,
+    targetWidth,
+    targetHeight,
+    fontSize,
+    ascent,
+    descent,
+    baseline,
+  } = firstPage.capture;
   return {
     format: 'ascii-gpu-studio',
     version: 1,
@@ -174,15 +189,19 @@ function createDocument({ kind, scene, firstPage, audio }) {
       rows,
       cellWidth,
       cellHeight,
-      width: columns * cellWidth,
-      height: rows * cellHeight,
+      width: outputWidth,
+      height: outputHeight,
       cellAspect: cellWidth / cellHeight,
+      source: { width: sourceWidth, height: sourceHeight },
+      target: { width: targetWidth, height: targetHeight },
       font: {
         family: firstPage.capture.vectorFamily ?? scene.typography.fontFamily,
         size: fontSize,
         weight: scene.typography.fontWeight,
+        lineHeight: scene.typography.lineHeight ?? 1.3,
         ascent,
         descent,
+        baseline,
         ...(firstPage.capture.vectorFontLicense
           ? { license: firstPage.capture.vectorFontLicense }
           : {}),
@@ -198,7 +217,7 @@ function createDocument({ kind, scene, firstPage, audio }) {
         mode: scene.appearance.mode,
         ...getAppearanceColors(scene.appearance),
       },
-      fit: scene.appearance.fit,
+      fit: 'contain',
     },
     frames: [firstPage.frame],
     ...(audio ? { audio } : {}),

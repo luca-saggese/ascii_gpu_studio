@@ -134,19 +134,23 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
 
 test('saves parameter defaults for reset and future sessions', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#columns').fill('144');
+  await page.locator('#font-size').fill('18');
+  await page.locator('#line-height').fill('1.5');
   await page.getByLabel('Enable edge detection').check();
   await page.getByLabel('Threshold value').fill('91');
   await page.getByRole('button', { name: 'Save defaults' }).click();
   await expect(page.getByText('Parametri predefiniti salvati')).toBeVisible();
-  await page.locator('#columns').fill('72');
+  await page.locator('#font-size').fill('12');
+  await page.locator('#line-height').fill('1.1');
   await page.getByLabel('Enable edge detection').uncheck();
   await page.locator('.panel-heading-actions .icon-button').click();
-  await expect(page.locator('#columns')).toHaveValue('144');
+  await expect(page.locator('#font-size')).toHaveValue('18');
+  await expect(page.locator('#line-height')).toHaveValue('1.5');
   await expect(page.getByLabel('Enable edge detection')).toBeChecked();
   await expect(page.getByLabel('Threshold value')).toHaveValue('91');
   await page.reload();
-  await expect(page.locator('#columns')).toHaveValue('144');
+  await expect(page.locator('#font-size')).toHaveValue('18');
+  await expect(page.locator('#line-height')).toHaveValue('1.5');
   await expect(page.getByLabel('Enable edge detection')).toBeChecked();
   await expect(page.getByLabel('Threshold value')).toHaveValue('91');
 });
@@ -204,9 +208,9 @@ test('imports an image, renders through WebGL2, and exports the source project',
   await page.locator('.breadcrumbs').click();
   await expect(page.getByRole('menu')).toHaveCount(0);
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
-  await expect(canvas).toHaveAttribute('data-columns', '96');
+  await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
-  await expect(page.getByLabel('Columns')).toHaveAttribute('max', '320');
+  await expect(page.locator('#font-size')).toHaveAttribute('max', '48');
   await expect(page.getByText('Character size')).toHaveCount(0);
   await expect
     .poll(() => canvas.getAttribute('data-atlas-scale').then(Number))
@@ -281,8 +285,14 @@ test('imports an image, renders through WebGL2, and exports the source project',
   await page.getByRole('button', { name: 'GPU', exact: true }).click();
   await expect(canvas).toBeVisible();
   const before = await canvas.evaluate((element) => element.toDataURL());
-  await page.getByLabel('Columns').fill('120');
-  await expect(canvas).toHaveAttribute('data-columns', '120');
+  const originalDimensions = await canvas.evaluate((element) => ({
+    width: element.dataset.outputWidth,
+    height: element.dataset.outputHeight,
+  }));
+  await page.locator('#font-size').fill('18');
+  await expect
+    .poll(() => canvas.getAttribute('data-output-width'))
+    .not.toBe(originalDimensions.width);
   const after = await canvas.evaluate((element) => element.toDataURL());
   expect(after).not.toBe(before);
   await page.getByRole('button', { name: 'Source color' }).click();
@@ -295,7 +305,15 @@ test('imports an image, renders through WebGL2, and exports the source project',
   expect(asciiBytes.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
   const asciiDocument = JSON.parse(strFromU8(gunzipSync(asciiBytes)));
   expect(asciiDocument.contentType).toBe('image');
-  expect(asciiDocument.render.columns).toBe(120);
+  expect(asciiDocument.render.columns).toBeGreaterThan(0);
+  expect(asciiDocument.render.width).toBe(
+    asciiDocument.render.columns * asciiDocument.render.cellWidth,
+  );
+  expect(asciiDocument.render.height).toBe(
+    asciiDocument.render.rows * asciiDocument.render.cellHeight,
+  );
+  expect(asciiDocument.render.width).toBeLessThanOrEqual(1024);
+  expect(asciiDocument.render.height).toBeLessThanOrEqual(576);
   expect(asciiDocument.frames).toHaveLength(1);
   expect(asciiDocument.frames[0].colors).toBeTruthy();
   expect(asciiDocument).not.toHaveProperty('source');
@@ -375,7 +393,7 @@ test('keeps the image preview working when WebGL2 context creation is unavailabl
   });
 
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
-  await expect(canvas).toHaveAttribute('data-columns', '96');
+  await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
   await expect(page.locator('.render-badge')).toContainText('Canvas2D fallback');
   await expect(page.locator('.toast')).toContainText('anteprima attiva con Canvas 2D');
   const rendered = await canvas.evaluate((element) => {
@@ -384,6 +402,97 @@ test('keeps the image preview working when WebGL2 context creation is unavailabl
     return data.some((channel, index) => index % 4 !== 3 && channel !== 0);
   });
   expect(rendered).toBe(true);
+});
+
+test('shares contained logical dimensions across bitmap, vector, PNG, and the offline player', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  const bitmap = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  const vector = page.locator('canvas[aria-label="ASCII vector rendering preview"]');
+  const sources = [
+    { width: 1920, height: 1080, targetWidth: 1024, targetHeight: 576 },
+    { width: 1080, height: 1920, targetWidth: 324, targetHeight: 576 },
+    { width: 1000, height: 1000, targetWidth: 576, targetHeight: 576 },
+  ];
+  let finalLayout;
+  for (const source of sources) {
+    const svg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${source.width}" height="${source.height}" viewBox="0 0 ${source.width} ${source.height}"><rect width="100%" height="100%" fill="#456"/><circle cx="${source.width / 2}" cy="${source.height / 2}" r="${Math.min(source.width, source.height) / 4}" fill="#eee"/></svg>`,
+    );
+    await page.locator('input[type=file]').setInputFiles({
+      name: `layout-${source.width}x${source.height}.svg`,
+      mimeType: 'image/svg+xml',
+      buffer: svg,
+    });
+    await expect(bitmap).toHaveAttribute('data-source-width', String(source.width));
+    const layout = await bitmap.evaluate((element) =>
+      Object.fromEntries(
+        [
+          'sourceWidth',
+          'sourceHeight',
+          'columns',
+          'rows',
+          'cellWidth',
+          'cellHeight',
+          'outputWidth',
+          'outputHeight',
+        ].map((key) => [key, Number(element.dataset[key])]),
+      ),
+    );
+    expect(layout.outputWidth).toBe(layout.columns * layout.cellWidth);
+    expect(layout.outputHeight).toBe(layout.rows * layout.cellHeight);
+    expect(layout.outputWidth).toBeLessThanOrEqual(source.targetWidth);
+    expect(layout.outputHeight).toBeLessThanOrEqual(source.targetHeight);
+    expect(layout.outputWidth).toBeLessThanOrEqual(1024);
+    expect(layout.outputHeight).toBeLessThanOrEqual(576);
+    finalLayout = layout;
+
+    await page.getByLabel('Rendering vettoriale').check();
+    await expect(vector).toHaveAttribute('data-output-width', String(layout.outputWidth));
+    await expect(vector).toHaveAttribute('data-output-height', String(layout.outputHeight));
+    await expect(vector).toHaveAttribute('data-columns', String(layout.columns));
+    await page.setViewportSize({ width: 900, height: 900 });
+    await expect(vector).toHaveAttribute('data-output-width', String(layout.outputWidth));
+    await page.getByLabel('Rendering vettoriale').uncheck();
+
+    const pngDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/ }).click();
+    await page.getByRole('menuitem', { name: 'Export PNG' }).click();
+    const pngFile = await pngDownload;
+    const png = await readFile(await pngFile.path());
+    expect(png.readUInt32BE(16)).toBe(layout.outputWidth);
+    expect(png.readUInt32BE(20)).toBe(layout.outputHeight);
+  }
+
+  const asciiDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const asciiFile = await asciiDownload;
+  const model = JSON.parse(strFromU8(gunzipSync(await readFile(await asciiFile.path()))));
+  expect(model.render.width).toBe(finalLayout.outputWidth);
+  expect(model.render.height).toBe(finalLayout.outputHeight);
+  expect(model.render.font.baseline).toBeGreaterThan(0);
+  expect(model.render.source).toEqual({ width: 1000, height: 1000 });
+
+  const htmlDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export HTML playable' }).click();
+  const htmlFile = await htmlDownload;
+  const htmlPath = testInfo.outputPath('contained-player.html');
+  await writeFile(htmlPath, await readFile(await htmlFile.path()));
+  const playerPage = await page.context().newPage();
+  await playerPage.goto(pathToFileURL(htmlPath).href);
+  const playerCanvas = playerPage.locator('canvas[aria-label="ASCII frame"]');
+  await expect(playerCanvas).toHaveJSProperty('width', finalLayout.outputWidth);
+  await expect(playerCanvas).toHaveJSProperty('height', finalLayout.outputHeight);
+  await expect(playerCanvas).toHaveCSS('object-fit', 'contain');
+  await playerPage.locator('#fullscreen').click();
+  await expect
+    .poll(() => playerPage.evaluate(() => Boolean(document.fullscreenElement)))
+    .toBe(true);
+  await expect(playerCanvas).toHaveJSProperty('width', finalLayout.outputWidth);
+  await playerPage.close();
 });
 
 test('renders and exports OpenType vector glyph outlines offline', async ({ page }, testInfo) => {
@@ -524,7 +633,7 @@ test('maps dark image cells to denser glyphs than bright image cells', async ({ 
     buffer: Buffer.from(png, 'base64'),
   });
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
-  await expect(canvas).toHaveAttribute('data-columns', '96');
+  await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
   const coverage = await canvas.evaluate((element) => {
     const gl = element.getContext('webgl2');
     const pixels = new Uint8Array(element.width * element.height * 4);
@@ -759,7 +868,7 @@ test('rejects a malicious .ascii archive with traversal paths', async ({ page })
 test('mounts the reusable Vue player against a real .ascii project', async ({ page }) => {
   await page.goto('/examples/vue/index.html');
   await expect(page.getByRole('heading', { name: 'ASCII GPU Studio — Vue runtime' })).toBeVisible();
-  await expect(page.getByLabel('ASCII media preview')).toHaveAttribute('data-columns', '64');
+  await expect(page.getByLabel('ASCII media preview')).toHaveAttribute('data-columns', /[1-9]\d*/);
   await expect(page.getByRole('button', { name: 'Capture PNG' })).toBeEnabled();
 });
 
@@ -771,8 +880,8 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   const video = page.locator('video.media-source');
   await expect(video).toHaveJSProperty('videoWidth', 320);
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
-  await expect(canvas).toHaveAttribute('data-columns', '96');
-  await expect(page.locator('.stage-status')).toContainText('96 ×');
+  await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
+  await expect(page.locator('.stage-status')).toContainText('×');
   await expect(page.getByLabel('Toggle loop')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Play video' }).click();
   await expect.poll(() => video.evaluate((element) => element.currentTime)).toBeGreaterThan(0.2);
@@ -842,8 +951,8 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   expect(mp4Metadata.hasH264).toBe(true);
   expect(mp4Metadata.hasAac).toBe(true);
   expect(Math.abs(mp4Metadata.duration - sourceDurationMs / 1000)).toBeLessThan(0.1);
-  expect(mp4Metadata.width).toBeGreaterThan(0);
-  expect(mp4Metadata.height).toBeGreaterThan(0);
+  expect(mp4Metadata.width).toBe(asciiDocument.render.width + (asciiDocument.render.width % 2));
+  expect(mp4Metadata.height).toBe(asciiDocument.render.height + (asciiDocument.render.height % 2));
 
   await page.locator('input[type=file]').setInputFiles({
     name: asciiFile.suggestedFilename(),

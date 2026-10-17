@@ -1,10 +1,11 @@
 export const DEFAULT_SCENE = Object.freeze({
   version: 1,
-  grid: { columns: 96, maxCells: 40000 },
+  grid: { maxCells: 40000 },
   typography: {
     charset: ' .,:;irsXA253hMHGS#9B&@',
     fontFamily: 'IBM Plex Mono',
     fontSize: 14,
+    lineHeight: 1.3,
     fontWeight: 500,
   },
   rendering: { mode: 'bitmap' },
@@ -30,20 +31,21 @@ export const DEFAULT_SCENE = Object.freeze({
 });
 
 export function validateScene(scene) {
-  const columns = Number(scene?.grid?.columns);
+  const columns = scene?.grid?.columns === undefined ? undefined : Number(scene.grid.columns);
   const charset = scene?.typography?.charset;
   const maxCells = Number(scene?.grid?.maxCells);
   const fontSize = Number(scene?.typography?.fontSize);
+  const lineHeight = Number(scene?.typography?.lineHeight ?? 1.3);
   const brightness = Number(scene?.appearance?.brightness);
   const contrast = Number(scene?.appearance?.contrast);
   const gamma = Number(scene?.appearance?.gamma);
   const edge = scene?.edgeDetection ?? DEFAULT_SCENE.edgeDetection;
   const flatten = scene?.flattenColors ?? DEFAULT_SCENE.flattenColors;
   const rendering = scene?.rendering ?? DEFAULT_SCENE.rendering;
-  if (!Number.isInteger(columns) || columns < 16 || columns > 320)
-    throw new Error('La griglia deve avere da 16 a 320 colonne.');
-  if (!Number.isInteger(maxCells) || maxCells < columns || maxCells > 100000)
-    throw new Error('Il limite celle deve essere un intero tra le colonne e 100.000.');
+  if (columns !== undefined && (!Number.isInteger(columns) || columns < 16 || columns > 320))
+    throw new Error('Il limite storico della griglia deve essere da 16 a 320 colonne.');
+  if (!Number.isInteger(maxCells) || maxCells < 1 || maxCells > 100000)
+    throw new Error('Il limite celle deve essere un intero tra 1 e 100.000.');
   if (
     typeof charset !== 'string' ||
     Array.from(new Set(Array.from(charset))).length < 2 ||
@@ -53,6 +55,8 @@ export function validateScene(scene) {
   }
   if (!Number.isFinite(fontSize) || fontSize < 4 || fontSize > 96)
     throw new Error('La dimensione del font deve essere compresa tra 4 e 96 px.');
+  if (!Number.isFinite(lineHeight) || lineHeight < 1 || lineHeight > 2)
+    throw new Error('L’interlinea deve essere compresa tra 1 e 2.');
   if (!Number.isFinite(brightness) || brightness < -1 || brightness > 1)
     throw new Error('La luminosità deve essere compresa tra -1 e 1.');
   if (!Number.isFinite(contrast) || contrast < 0.2 || contrast > 3)
@@ -116,16 +120,60 @@ export function getAppearanceColors(appearance) {
 
 export function fontFamilyFor(fontFamily) {
   if (fontFamily === 'Courier New' || fontFamily === 'Cousine') return 'Cousine';
-  if (fontFamily === 'serif' || fontFamily === 'Lora') return 'Lora';
   return 'IBM Plex Mono';
 }
 
-export function gridForSource(width, height, columns, cellAspect = 0.58) {
-  const safeWidth = Math.max(1, Number(width) || 1);
-  const safeHeight = Math.max(1, Number(height) || 1);
+export function calculateContentLayout(
+  sourceWidth,
+  sourceHeight,
+  cellWidth,
+  cellHeight,
+  maxCells = 40000,
+) {
+  if (
+    ![sourceWidth, sourceHeight, cellWidth, cellHeight, maxCells].every(Number.isFinite) ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0 ||
+    cellWidth < 1 ||
+    cellHeight < 1 ||
+    !Number.isInteger(maxCells) ||
+    maxCells < 1
+  ) {
+    throw new Error('Dimensioni della sorgente o delle celle non valide.');
+  }
+  const scale = Math.min(1024 / sourceWidth, 576 / sourceHeight);
+  const targetWidth = sourceWidth * scale;
+  const targetHeight = sourceHeight * scale;
+  let columns = Math.floor(targetWidth / cellWidth);
+  let rows = Math.floor(targetHeight / cellHeight);
+  if (columns < 1 || rows < 1) {
+    throw new Error(
+      'Il font selezionato non permette almeno una cella per asse entro 1024 × 576 px. Riduci dimensione o interlinea.',
+    );
+  }
+  if (columns * rows > maxCells) {
+    const reduction = Math.sqrt(maxCells / (columns * rows));
+    columns = Math.max(1, Math.floor(columns * reduction));
+    rows = Math.max(1, Math.floor(rows * reduction));
+    while (columns * rows > maxCells) {
+      if (columns / targetWidth > rows / targetHeight) columns -= 1;
+      else rows -= 1;
+    }
+  }
+  const outputWidth = columns * cellWidth;
+  const outputHeight = rows * cellHeight;
   return {
+    sourceWidth,
+    sourceHeight,
+    targetWidth,
+    targetHeight,
     columns,
-    rows: Math.max(1, Math.round(((columns * safeHeight) / safeWidth) * cellAspect)),
+    rows,
+    cellWidth,
+    cellHeight,
+    outputWidth,
+    outputHeight,
+    aspectRatio: outputWidth / outputHeight,
   };
 }
 

@@ -13,7 +13,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-031 [P0] Export PNG by rendering ASCII pages at configured cell resolution — browser verifies dimensions and parity with offline HTML render.
 - [x] AGPU-032 [P0] Vue `AsciiPlayer` wrapper and runnable example — M5; browser loads a generated `.ascii` and renders it; `9c9633c`.
 - [x] AGPU-040 [P0] Reject ZIP traversal and drive-absolute paths during bounded streaming extraction — unit/E2E cover path rejection; `06410a5`.
-- [x] AGPU-014 [P1] Remove user font-size control and improve raster detail — fixed internal 20 px glyph size, 4×–8× GPU-aware atlas scale, and 32–320 column control; covered by Chromium E2E.
+- [x] AGPU-014 [P1] Expose typography controls and improve raster detail — logical font-size/line-height controls, integer cell metrics, and 4×–8× GPU-aware atlas rasterization; covered by Chromium E2E.
 - [x] AGPU-056 [P1] Add shared gzip-JSON ASCII result format, deterministic frame sampling, optional audio capture, PNG export, standalone offline HTML player, and accessible export dropdown; browser coverage includes image color and video with/without audio.
 - [x] AGPU-058 [P1] Add fixed-scale Sobel Edge Detection with configurable smoothing, threshold, solo-edge/image blend modes, live WebGL preview, 2× grid ASCII conversion, and `.ascii` filter metadata; lint, unit, build, format, and Chromium E2E pass.
 - [x] AGPU-059 [P1] Save and persist the current full parameter set as browser defaults; startup and Reset settings restore it, covered by Chromium reload/reset E2E.
@@ -25,6 +25,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-065 [P1] Reduce CPU cost in deterministic video ASCII capture by precomputing Sobel luminance/blur and removing bilateral-filter neighbor allocations; verify output against the reference edge calculation.
 - [x] AGPU-066 [P1] Add a strict black-and-white appearance mode with binary luminance and glyph masks, black/white-only output, and mode metadata; verify WebGL, vector, and export output in Chromium.
 - [x] AGPU-067 [P1] Add a Python terminal player for gzip-JSON `.ascii` video with centered cropping, timestamp-driven adaptive frame pacing, optional FPS cap, and embedded FFplay audio; cover decoding, crop, and RGB output with unit tests.
+- [x] AGPU-066 [P1] Unify source-aware logical dimensions and integer font-cell metrics across bitmap/vector preview, PNG, MP4, `.ascii`, and offline HTML; preserve contain behavior and verify horizontal, vertical, and square media.
 
 ## In progress
 

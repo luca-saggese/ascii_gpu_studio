@@ -19,6 +19,7 @@ function cloneScene(value) {
 }
 
 function renderCurrentFrame() {
+  if (!mediaSize.value.width || !mediaSize.value.height) return;
   renderer.value?.renderFrame();
   if (scene.value.rendering?.mode !== 'vector' || asciiMode.value || !vectorCanvas.value) return;
   if (!outlineFontsReady) {
@@ -42,14 +43,15 @@ function renderCurrentFrame() {
       rows: capture.rows,
       cellWidth: capture.cellWidth,
       cellHeight: capture.cellHeight,
-      width: capture.columns * capture.cellWidth,
-      height: capture.rows * capture.cellHeight,
+      width: capture.outputWidth,
+      height: capture.outputHeight,
       font: {
         family: capture.vectorFamily,
         size: capture.fontSize,
         weight: scene.value.typography.fontWeight,
         ascent: capture.ascent,
         descent: capture.descent,
+        baseline: capture.baseline,
       },
       colors: {
         mode: scene.value.appearance.mode,
@@ -59,6 +61,25 @@ function renderCurrentFrame() {
       unitsPerEm: capture.unitsPerEm,
       glyphs: capture.vectorGlyphs,
     });
+    vectorCanvas.value.dataset.columns = String(capture.columns);
+    vectorCanvas.value.dataset.rows = String(capture.rows);
+    vectorCanvas.value.dataset.outputWidth = String(capture.outputWidth);
+    vectorCanvas.value.dataset.outputHeight = String(capture.outputHeight);
+    vectorCanvas.value.dataset.cellWidth = String(capture.cellWidth);
+    vectorCanvas.value.dataset.cellHeight = String(capture.cellHeight);
+    vectorCanvas.value.dataset.sourceWidth = String(capture.sourceWidth);
+    vectorCanvas.value.dataset.sourceHeight = String(capture.sourceHeight);
+    statsLabel.value = {
+      ...statsLabel.value,
+      columns: capture.columns,
+      rows: capture.rows,
+      outputWidth: capture.outputWidth,
+      outputHeight: capture.outputHeight,
+      renderWidth: capture.outputWidth,
+      renderHeight: capture.outputHeight,
+      cellWidth: capture.cellWidth,
+      cellHeight: capture.cellHeight,
+    };
   } catch (cause) {
     error.value = cause.message;
   }
@@ -71,6 +92,8 @@ function readSavedDefaults() {
   validateScene(parsed);
   parsed.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
   parsed.typography.fontFamily = fontFamilyFor(parsed.typography.fontFamily);
+  parsed.typography.lineHeight ??= 1.3;
+  parsed.appearance.fit = 'contain';
   return cloneScene(parsed);
 }
 
@@ -140,7 +163,7 @@ async function initializeRenderer() {
   if (!canvas.value || renderer.value) return;
   try {
     await document.fonts.load(
-      `${scene.value.typography.fontWeight} 20px "${fontFamilyFor(scene.value.typography.fontFamily)}"`,
+      `${scene.value.typography.fontWeight} ${scene.value.typography.fontSize}px "${fontFamilyFor(scene.value.typography.fontFamily)}"`,
     );
     renderer.value = createAsciiRenderer({
       canvas: canvas.value,
@@ -184,6 +207,17 @@ async function importFile(file) {
           width: project.render.width,
           height: project.render.height,
         };
+        statsLabel.value = {
+          ...statsLabel.value,
+          columns: project.render.columns,
+          rows: project.render.rows,
+          outputWidth: project.render.width,
+          outputHeight: project.render.height,
+          renderWidth: project.render.width,
+          renderHeight: project.render.height,
+          cellWidth: project.render.cellWidth,
+          cellHeight: project.render.cellHeight,
+        };
         asciiText.value = project.frames[0].text;
         asciiMode.value = true;
         currentTime.value = 0;
@@ -197,6 +231,8 @@ async function importFile(file) {
       scene.value = project.scene;
       scene.value.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
       scene.value.typography.fontFamily = fontFamilyFor(scene.value.typography.fontFamily);
+      scene.value.typography.lineHeight ??= 1.3;
+      scene.value.appearance.fit = 'contain';
       const restored = new File([project.media], project.manifest.media.path.split('/').pop(), {
         type: project.manifest.media.mime,
       });
@@ -274,8 +310,10 @@ function updateAsciiText(isVideoFrame = false) {
         ...statsLabel.value,
         columns: result.columns,
         rows: result.rows,
-        outputWidth: result.columns * result.cellWidth,
-        outputHeight: result.rows * result.cellHeight,
+        outputWidth: result.outputWidth,
+        outputHeight: result.outputHeight,
+        cellWidth: result.cellWidth,
+        cellHeight: result.cellHeight,
       };
     }
   } catch (err) {
@@ -433,11 +471,14 @@ async function performExport(kind) {
           const capture = renderer.value?.captureText();
           if (!capture) throw new Error('Carica prima un video.');
           return {
-            width: Math.ceil((capture.columns * capture.cellWidth) / 2) * 2,
-            height: Math.ceil((capture.rows * capture.cellHeight) / 2) * 2,
+            width: Math.ceil(capture.outputWidth / 2) * 2,
+            height: Math.ceil(capture.outputHeight / 2) * 2,
           };
         })();
-      await assertDeterministicMp4Support(dimensions.width, dimensions.height);
+      await assertDeterministicMp4Support(
+        dimensions.width + (dimensions.width % 2),
+        dimensions.height + (dimensions.height % 2),
+      );
       const model = await buildExportDocument({
         signal: controller.signal,
         progressStart: 0,
@@ -685,12 +726,7 @@ function onKeydown(event) {
               </button>
             </div>
             <div class="control-row">
-              <label for="fit">Fit mode</label
-              ><select id="fit" v-model="scene.appearance.fit">
-                <option value="contain">Contain</option>
-                <option value="cover">Cover</option>
-                <option value="stretch">Stretch</option>
-              </select>
+              <label>Fit mode</label><span class="control-value">Contain</span>
             </div>
           </details>
           <details class="inspector-section" open>
@@ -704,7 +740,6 @@ function onKeydown(event) {
               ><select id="font" v-model="scene.typography.fontFamily">
                 <option value="IBM Plex Mono">IBM Plex Mono</option>
                 <option value="Cousine">Cousine</option>
-                <option value="Lora">Lora</option>
               </select>
             </div>
             <label class="check-row"
@@ -729,18 +764,29 @@ function onKeydown(event) {
                 <option value=" 01">Binary</option>
               </select>
             </div>
-            <label class="field-label" for="columns"
-              >Columns <output>{{ scene.grid.columns }}</output></label
+            <label class="field-label" for="font-size"
+              >Font size <output>{{ scene.typography.fontSize }} px</output></label
             >
             <input
-              id="columns"
-              v-model.number="scene.grid.columns"
+              id="font-size"
+              v-model.number="scene.typography.fontSize"
               type="range"
-              min="32"
-              max="320"
+              min="8"
+              max="48"
               step="1"
             />
-            <div class="range-ends"><span>32</span><span>320</span></div>
+            <div class="range-ends"><span>8 px</span><span>48 px</span></div>
+            <label class="field-label" for="line-height"
+              >Line height <output>{{ scene.typography.lineHeight.toFixed(2) }}×</output></label
+            >
+            <input
+              id="line-height"
+              v-model.number="scene.typography.lineHeight"
+              type="range"
+              min="1"
+              max="2"
+              step="0.05"
+            />
           </details>
           <details class="inspector-section" open>
             <summary class="section-title">
