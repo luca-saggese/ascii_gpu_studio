@@ -749,7 +749,6 @@ input[type='range'] {
 .canvas-frame {
   position: absolute;
   inset: 30px;
-  display: grid;
   place-items: center;
 }
 .canvas-frame canvas {
@@ -802,12 +801,16 @@ input[type='range'] {
   width: max-content;
   max-width: 100%;
   margin: 0;
-  color: #d5f5e9;
-  background: #101715;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: min(calc(90cqw / var(--columns) / 0.62), calc(90cqh / var(--rows) / 1.2));
-  line-height: 1.2;
-  letter-spacing: 0;
+  color: var(--preview-foreground);
+  background: var(--preview-background);
+  font-family: var(--preview-font), ui-monospace, monospace;
+  font-size: min(
+    calc(100cqw / var(--columns) * var(--font-size) / var(--cell-width)),
+    calc(100cqh / var(--rows) * var(--font-size) / var(--cell-height))
+  );
+  font-weight: var(--preview-weight);
+  line-height: var(--cell-line-height);
+  letter-spacing: calc(1em * var(--cell-spacing));
   white-space: pre;
   text-rendering: geometricPrecision;
   font-variant-ligatures: none;

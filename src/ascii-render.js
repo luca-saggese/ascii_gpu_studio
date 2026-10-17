@@ -81,8 +81,12 @@ export function renderAsciiPage(context, page, render) {
   return context.canvas;
 }
 
-export function renderAsciiPng(asciiDocument, signal) {
-  if (typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined') {
+export async function renderAsciiPng(asciiDocument, signal) {
+  if (
+    asciiDocument.render.mode === 'vector' &&
+    typeof Worker !== 'undefined' &&
+    typeof OffscreenCanvas !== 'undefined'
+  ) {
     return new Promise((resolve, reject) => {
       let worker;
       const workerUrl = URL.createObjectURL(
@@ -122,6 +126,10 @@ export function renderAsciiPng(asciiDocument, signal) {
         render: JSON.parse(JSON.stringify(asciiDocument.render)),
       });
     });
+  }
+  if (asciiDocument.render.mode !== 'vector') {
+    const { family, size, weight } = asciiDocument.render.font;
+    await globalThis.document.fonts.load(`${weight} ${size}px "${family}"`);
   }
   const canvas = globalThis.document.createElement('canvas');
   renderAsciiPage(canvas.getContext('2d'), asciiDocument.frames[0], asciiDocument.render);

@@ -47,6 +47,7 @@ uniform float edgeIntensity;
 uniform float flattenEnabled;
 uniform float flattenSmoothing;
 uniform float paletteCount;
+uniform float captureMode;
 uniform vec3 foreground;
 uniform vec3 background;
 uniform sampler2D paletteTex;
@@ -157,6 +158,10 @@ void main(){
   value=mix(value,1.-value,invertValue);
 
   float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
+  if(captureMode>.5){
+    color=captureMode<1.5 ? vec4(glyphIndex/max(glyphCount-1.,1.),0.,0.,1.) : vec4(avg,1.);
+    return;
+  }
   vec2 tilePixels=tileSize*atlasScale;
   vec2 atlasUv=vec2(
     (glyphIndex*tilePixels.x+.5+inCell.x*(tilePixels.x-1.))/(glyphCount*tilePixels.x),
@@ -248,6 +253,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         'flattenEnabled',
         'flattenSmoothing',
         'paletteCount',
+        'captureMode',
         'foreground',
         'background',
         'paletteTex',
@@ -352,6 +358,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     );
     tile.ascent = ascent;
     tile.descent = descent;
+    tile.advance = advance;
     tile.width = Math.max(1, Math.ceil(advance));
     tile.height = Math.max(
       Math.ceil(ascent + descent),
@@ -399,8 +406,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     atlas = { count: chars.length, chars };
   }
 
-  function renderFrame() {
-    if (currentScene.rendering?.mode === 'vector') {
+  function renderFrame(captureMode = 0) {
+    if (currentScene.rendering?.mode === 'vector' && captureMode === 0) {
       if (layout) {
         canvas.dataset.columns = String(layout.columns);
         canvas.dataset.rows = String(layout.rows);
@@ -458,6 +465,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
           renderScale: 1,
           cellWidth: capture.cellWidth,
           cellHeight: capture.cellHeight,
+          cellAdvance: capture.cellAdvance,
           backend,
         });
       }
@@ -469,7 +477,12 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const renderScale = Math.max(1, Math.floor(dpr));
     canvas.width = Math.max(1, Math.round(layout.outputWidth * renderScale));
     canvas.height = Math.max(1, Math.round(layout.outputHeight * renderScale));
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.viewport(
+      0,
+      0,
+      captureMode ? layout.columns : canvas.width,
+      captureMode ? layout.rows : canvas.height,
+    );
     gl.useProgram(program);
     gl.bindVertexArray(vao);
     gl.activeTexture(gl.TEXTURE0);
@@ -527,6 +540,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
           : 0,
     );
 
+    setUniforms('captureMode', captureMode);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     canvas.dataset.columns = String(layout.columns);
     canvas.dataset.rows = String(layout.rows);
@@ -554,6 +568,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         renderScale,
         cellWidth: tile.width,
         cellHeight: tile.height,
+        cellAdvance: tile.advance,
+        cellAdvance: tile.advance,
         backend,
       });
     }
@@ -641,12 +657,47 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       }
       if (y < grid.rows - 1) text += '\n';
     }
+    if (gl) {
+      const glyphPixels = new Uint8Array(grid.columns * grid.rows * 4);
+      let colorPixels = null;
+      try {
+        renderFrame(1);
+        gl.readPixels(0, 0, grid.columns, grid.rows, gl.RGBA, gl.UNSIGNED_BYTE, glyphPixels);
+        if (cellColors) {
+          colorPixels = new Uint8Array(grid.columns * grid.rows * 4);
+          renderFrame(2);
+          gl.readPixels(0, 0, grid.columns, grid.rows, gl.RGBA, gl.UNSIGNED_BYTE, colorPixels);
+        }
+      } finally {
+        renderFrame();
+      }
+
+      const lines = text.split('\n');
+      for (let y = 0; y < grid.rows; y += 1) {
+        const line = Array.from(lines[y]);
+        for (let x = 0; x < grid.columns; x += 1) {
+          const offset = ((grid.rows - 1 - y) * grid.columns + x) * 4;
+          const glyphIndex = Math.round((glyphPixels[offset] * (glyphs.length - 1)) / 255);
+          line[x] = glyphs[glyphIndex];
+          if (colorPixels) {
+            const colorOffset = (y * grid.columns + x) * 3;
+            cellColors[colorOffset] = colorPixels[offset];
+            cellColors[colorOffset + 1] = colorPixels[offset + 1];
+            cellColors[colorOffset + 2] = colorPixels[offset + 2];
+          }
+        }
+        lines[y] = line.join('');
+      }
+      text = lines.join('\n');
+    }
+
     const capture = {
       text,
       columns: grid.columns,
       rows: grid.rows,
       cellWidth: tile.width,
       cellHeight: tile.height,
+      cellAdvance: tile.advance,
       outputWidth: grid.outputWidth,
       outputHeight: grid.outputHeight,
       sourceWidth: grid.sourceWidth,

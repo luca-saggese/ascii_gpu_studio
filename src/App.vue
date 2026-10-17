@@ -6,10 +6,9 @@ import { loadOutlineFonts } from './glyph-geometry.js';
 import { readAscii } from './format.js';
 import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-document.js';
 import { captureAsciiDocument } from './ascii-export.js';
-import { renderAsciiPng } from './ascii-render.js';
+import { renderAsciiPage, renderAsciiPng } from './ascii-render.js';
 import { createPlayableHtml } from './templates/playable-template.js';
 import { assertDeterministicMp4Support, encodeAsciiMp4 } from './mp4-export.js';
-import { renderAsciiPage } from './ascii-render.js';
 
 const DEFAULTS_STORAGE_KEY = 'ascii-gpu-studio:scene-defaults:v1';
 let defaultsLoadError = '';
@@ -79,6 +78,7 @@ function renderCurrentFrame() {
       renderHeight: capture.outputHeight,
       cellWidth: capture.cellWidth,
       cellHeight: capture.cellHeight,
+      cellAdvance: capture.cellAdvance,
     };
   } catch (cause) {
     error.value = cause.message;
@@ -120,7 +120,16 @@ const mediaKind = ref('');
 const mediaUrl = ref('');
 const mediaSize = ref({ width: 0, height: 0 });
 const asciiDocument = ref(null);
-const statsLabel = ref({ columns: 0, rows: 0, outputWidth: 0, outputHeight: 0, backend: 'WebGL2' });
+const statsLabel = ref({
+  columns: 0,
+  rows: 0,
+  outputWidth: 0,
+  outputHeight: 0,
+  cellWidth: 0,
+  cellHeight: 0,
+  cellAdvance: 0,
+  backend: 'WebGL2',
+});
 const playing = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
@@ -144,6 +153,30 @@ let outlineFontsLoading = null;
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value));
 const durationLabel = computed(() => formatTime(duration.value));
+const asciiPreviewStyle = computed(() => {
+  const font = asciiDocument.value?.render.font ?? scene.value.typography;
+  const fontSize = Math.max(1, font.size ?? font.fontSize);
+  const cellWidth = Math.max(1, statsLabel.value.cellWidth || 1);
+  const cellHeight = Math.max(1, statsLabel.value.cellHeight || 1);
+  const cellAdvance = Math.min(cellWidth, Math.max(0, statsLabel.value.cellAdvance || cellWidth));
+  const colors = asciiDocument.value?.render.colors ?? {
+    mode: scene.value.appearance.mode,
+    ...getAppearanceColors(scene.value.appearance),
+  };
+  return {
+    '--columns': Math.max(1, statsLabel.value.columns),
+    '--rows': Math.max(1, statsLabel.value.rows),
+    '--font-size': fontSize,
+    '--cell-width': cellWidth,
+    '--cell-height': cellHeight,
+    '--cell-line-height': cellHeight / fontSize,
+    '--cell-spacing': (cellWidth - cellAdvance) / fontSize,
+    '--preview-font': `"${fontFamilyFor(font.family ?? scene.value.typography.fontFamily)}"`,
+    '--preview-weight': font.weight ?? scene.value.typography.fontWeight,
+    '--preview-foreground': colors.foreground,
+    '--preview-background': colors.background,
+  };
+});
 const hasContent = computed(() => Boolean(mediaFile.value || asciiDocument.value));
 
 function formatTime(seconds) {
@@ -217,6 +250,7 @@ async function importFile(file) {
           renderHeight: project.render.height,
           cellWidth: project.render.cellWidth,
           cellHeight: project.render.cellHeight,
+          cellAdvance: project.render.cellWidth,
         };
         asciiText.value = project.frames[0].text;
         asciiMode.value = true;
@@ -299,6 +333,10 @@ function onVideoReady() {
 }
 
 function updateAsciiText(isVideoFrame = false) {
+  if (asciiDocument.value) {
+    asciiText.value = asciiDocument.value.frames[0].text;
+    return;
+  }
   const now = performance.now();
   if (isVideoFrame && now - lastTextFrameTime < 125) return;
   try {
@@ -314,6 +352,7 @@ function updateAsciiText(isVideoFrame = false) {
         outputHeight: result.outputHeight,
         cellWidth: result.cellWidth,
         cellHeight: result.cellHeight,
+        cellAdvance: result.cellAdvance,
       };
     }
   } catch (err) {
@@ -1038,10 +1077,7 @@ function onKeydown(event) {
           <div
             v-if="hasContent && (asciiMode || asciiDocument)"
             class="ascii-preview"
-            :style="{
-              '--columns': statsLabel.columns,
-              '--rows': statsLabel.rows,
-            }"
+            :style="asciiPreviewStyle"
           >
             <pre aria-label="Plain text ASCII preview">{{ asciiText }}</pre>
             <div class="canvas-label"><i /> PLAIN TEXT · {{ statsLabel.columns }} COLUMNS</div>

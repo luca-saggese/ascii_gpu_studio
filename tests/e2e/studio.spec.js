@@ -74,7 +74,31 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
   expect(bitmapColors.white).toBeGreaterThan(0);
 
   await page.getByRole('button', { name: 'ASCII text' }).click();
-  const text = await page.getByLabel('Plain text ASCII preview').textContent();
+  const text = await page.locator('.ascii-preview pre').textContent();
+  const textCanvas = page.getByLabel('Plain text ASCII preview');
+  await expect(textCanvas).toBeVisible();
+  const selectedText = await textCanvas.evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return {
+      text: selection.toString(),
+      userSelect: getComputedStyle(element).userSelect,
+    };
+  });
+  expect(selectedText.text).toBe(text);
+  expect(selectedText.userSelect).not.toBe('none');
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+  const dimensions = await bitmap.evaluate((canvas) => ({
+    width: Number(canvas.dataset.outputWidth),
+    height: Number(canvas.dataset.outputHeight),
+  }));
+  const previewBounds = await textCanvas.boundingBox();
+  expect(
+    Math.abs(previewBounds.width / previewBounds.height - dimensions.width / dimensions.height),
+  ).toBeLessThan(0.02);
   expect(new Set(text.replaceAll('\n', '')).size).toBeGreaterThan(2);
   await page.getByRole('button', { name: 'GPU', exact: true }).click();
   await page.getByLabel('Rendering vettoriale').check();
@@ -97,6 +121,8 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
   await page.getByRole('button', { name: /Export/ }).click();
   await page.getByRole('menuitem', { name: 'Export PNG' }).click();
   const pngBytes = await readFile(await (await pngDownload).path());
+  expect(pngBytes.readUInt32BE(16)).toBe(dimensions.width);
+  expect(pngBytes.readUInt32BE(20)).toBe(dimensions.height);
   const pngIsBinary = await page.evaluate(async (base64) => {
     const image = new Image();
     image.src = `data:image/png;base64,${base64}`;
@@ -129,6 +155,7 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
     background: '#000000',
   });
   expect(document.frames[0]).not.toHaveProperty('colors');
+  expect(document.frames[0].text).toBe(text);
   expect(new Set(document.frames[0].text.replaceAll('\n', '')).size).toBeGreaterThan(2);
 });
 
@@ -278,7 +305,7 @@ test('imports an image, renders through WebGL2, and exports the source project',
   const textPreview = page.getByLabel('Plain text ASCII preview');
   await expect(textPreview).toBeVisible();
   await expect(page.locator('.stage-status')).toContainText('text chars');
-  const textRows = await textPreview.textContent();
+  const textRows = await page.locator('.ascii-preview pre').textContent();
   expect(textRows.split('\n')).toHaveLength(renderedRows);
   expect(textRows).toMatch(/[@#XMAHGS]/);
   await page.screenshot({ path: 'docs/screenshots/plain-text-ascii.png' });
@@ -323,7 +350,7 @@ test('imports an image, renders through WebGL2, and exports the source project',
     mimeType: 'application/gzip',
     buffer: asciiBytes,
   });
-  await expect(page.getByLabel('Plain text ASCII preview')).toContainText(/[@#XMAHGS]/);
+  await expect(page.locator('.ascii-preview pre')).toContainText(/[@#XMAHGS]/);
   const pngDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: /Export/ }).click();
   await page.getByRole('menuitem', { name: 'Export PNG' }).click();
