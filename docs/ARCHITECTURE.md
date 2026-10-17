@@ -26,6 +26,8 @@ Exports share a versioned ASCII result model. `src/ascii-export.js` samples vide
 
 MP4 export renders the already-converted ASCII pages to a fixed even-dimension canvas and sends each page, with its original timestamp and duration, through Mediabunny's WebCodecs H.264 encoder and MP4 muxer. For a source video, Mediabunny demuxes and decodes audio directly from the original local file; an imported `.ascii` model instead uses its embedded audio. Samples are clipped to the frame timeline, re-encoded as AAC, and muxed with the video. MP4 capture skips the real-time MediaRecorder phase used by `.ascii` export. The app checks H.264 support before frame capture and AAC support when an audio track is present; unsupported codec/device combinations fail explicitly. Chromium E2E verifies playback and both tracks. Safari still requires real-device/browser-matrix validation.
 
+`tools/play_ascii.py` is a standard-library Python terminal player for gzip-JSON `.ascii` documents. It centers frames in the current terminal and crops overflow, selects frames by absolute document timestamps, and drops frames that arrive late rather than accumulating playback drift. An optional `--fps` caps terminal redraws; otherwise frame timestamps determine the redraw cadence. Embedded audio is decoded and played by an external FFplay process with the stored audio offset applied; system audio start/output latency means initial synchronization is approximate.
+
 ## Decisions
 
 - No remote font/CDN dependency: the interface uses system fonts, while the reproducible ASCII renderer uses bundled local font assets.

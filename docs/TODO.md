@@ -24,6 +24,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-064 [P1] Preserve bitmap preview when WebGL2 context creation is unavailable using a Canvas 2D fallback, expose the actual backend, and verify the fallback in Chromium.
 - [x] AGPU-065 [P1] Reduce CPU cost in deterministic video ASCII capture by precomputing Sobel luminance/blur and removing bilateral-filter neighbor allocations; verify output against the reference edge calculation.
 - [x] AGPU-066 [P1] Add a strict black-and-white appearance mode with binary luminance and glyph masks, black/white-only output, and mode metadata; verify WebGL, vector, and export output in Chromium.
+- [x] AGPU-067 [P1] Add a Python terminal player for gzip-JSON `.ascii` video with centered cropping, timestamp-driven adaptive frame pacing, optional FPS cap, and embedded FFplay audio; cover decoding, crop, and RGB output with unit tests.
 
 ## In progress
 

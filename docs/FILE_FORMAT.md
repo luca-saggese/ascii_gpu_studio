@@ -63,6 +63,8 @@ Black-and-white rendering uses `render.colors.mode: "bw"` with white foreground 
 
 Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. For `.ascii` export, the browser records the source audio track in a supported audio-only container (normally WebM/Opus in Chromium or MP4/AAC in Safari) and embeds those bytes. `offsetMs` is relative to the ASCII frame timeline. HTML playback uses the audio clock when audio is present and a monotonic clock otherwise. MP4 export from a loaded source video demuxes audio directly from the original local file; MP4 export from an imported `.ascii` document decodes its embedded audio. Both paths encode the audio as AAC.
 
+`tools/play_ascii.py` reads this gzip-JSON format directly. It schedules frames against their `timestampMs` values, uses embedded `durationMs` for the final frame, honors audio `offsetMs`, and delegates embedded audio playback to the local FFplay executable. FFplay/device output latency can cause a small initial sync offset; if FFplay is unavailable, use `--no-audio` to play the frames silently.
+
 The serialization and validation boundary lives in `src/ascii-document.js`; image/video frame capture is in `src/ascii-export.js`. Full-frame pages are used in v1 so a future version can introduce delta frames or chunk compression behind the same reader/player boundary.
 
 `filters.edgeDetection` records the settings used to make the pages. The pages already contain the filtered ASCII result; readers and the offline HTML player display them directly and do not rerun edge detection.

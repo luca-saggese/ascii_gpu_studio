@@ -16,6 +16,8 @@ Flatten Colors uses bilateral smoothing and an OKLab nearest-color palette witho
 
 Appearance has a dedicated strict B/W mode in addition to monochrome and source RGB. It thresholds luminance to the charset's lightest/densest glyphs, fixes ink/background to white/black, and emits only binary pixels with no per-cell RGB field. Chromium E2E verifies WebGL and vector previews plus `.ascii` metadata.
 
+`tools/play_ascii.py` is a standard-library Python 3 player for gzip JSON `.ascii` documents. It centers/crops frames to the terminal, schedules by document timestamps and drops late frames to avoid cumulative delay; `--fps` caps redraws. Embedded audio plays through external FFplay, with an acknowledged small startup/device latency limitation. Run its unit tests with `python3 -m unittest discover -s tools -p 'test_*.py'`.
+
 The inspector is viewport-bounded, scrolls independently from the page, and keeps its header/footer outside the scroll area. All five settings groups use native collapsible details/summary; edge mode is a select menu.
 
 The fixed 20-million-cumulative-cell export limit was removed from both video capture and `.ascii` validation. A video is still capped at 30 minutes; complete frame data is held in memory, so actual exports remain bounded by available browser memory and the gzip document byte caps.
@@ -46,6 +48,7 @@ pnpm test:e2e
 - Source audio is native video playback only; never audio-reactive.
 - ZIP v1 limits: 32 entries, 110 MiB compressed, 200 MiB expanded; media source cap 100 MiB.
 - No third-party fonts or remote Google Fonts. The synthetic video fixture is project-generated VP8/Opus.
+- The terminal player needs no Python packages; FFplay from an FFmpeg installation is required for embedded audio.
 
 ## Current gaps
 

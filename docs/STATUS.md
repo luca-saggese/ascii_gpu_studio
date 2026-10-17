@@ -31,6 +31,7 @@ Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnp
 - Vector preview uses Canvas 2D path rasterization rather than WebGL; large grids and video can therefore be slower than bitmap preview.
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
+- `tools/play_ascii.py` plays `.ascii` videos in the terminal, centers/crops frames to terminal dimensions, follows source timestamps while dropping late frames, supports an optional FPS ceiling, and plays embedded audio through FFplay. The standalone script requires Python 3; audio playback requires FFplay.
 - MP4 export uses Mediabunny to mux deterministic ASCII-rendered H.264 frames and, when available, AAC audio into a real MP4. For source videos it demuxes audio directly from the original local file; imported `.ascii` documents use their embedded audio. Encoder support is checked at the selected dimensions; unsupported codecs report an explicit capability error instead of producing a mislabeled file.
 - Chromium E2E covers the panel's bounded scrolling and collapsible groups, live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, playable H.264/AAC MP4 with audio and silent MP4, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
 
@@ -49,6 +50,7 @@ Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnp
 - Canvas 2D fallback preserves the preview when WebGL2 is unavailable, but CPU conversion can be slower, especially for video and high column counts. WebGL2 remains recommended for performance.
 - Video ASCII export captures optional audio in real time before deterministic 100 ms frame conversion; long clips can therefore remain time-consuming even after the CPU filter optimizations.
 - Browser codec support/autoplay policy governs video. Source file cap 100 MiB; legacy ZIP imports cap 110 MiB compressed, 200 MiB expanded, 32 entries. New `.ascii` gzip JSON export is not source-size bounded after compression.
+- The terminal player uses a monotonic wall clock with the external FFplay process; audio device/startup latency can cause a small initial sync offset. Without FFplay, use `--no-audio`.
 - `@ascii-gpu/vue` is currently a local workspace source package, not yet a standalone publishable package.
 - The image preview stores the original media but handles EXIF/magic-byte validation and unusual color profiles are not yet hardened.
 
