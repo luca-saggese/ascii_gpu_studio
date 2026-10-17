@@ -189,6 +189,11 @@ function onVideoReady() {
   video.value.volume = scene.value.playback.volume;
   renderer.value?.setSource(video.value);
   renderer.value?.renderFrame();
+  if (scene.value.flattenColors.enabled) {
+    ensureVideoPalette().catch((cause) => {
+      error.value = cause.message;
+    });
+  }
   if (asciiMode.value) updateAsciiText();
 }
 
@@ -269,7 +274,24 @@ function dropFile(event) {
 
 function updateScene() {
   renderer.value?.setScene(scene.value);
+  if (scene.value.flattenColors.enabled && mediaKind.value === 'video') {
+    ensureVideoPalette().catch((cause) => {
+      error.value = cause.message;
+    });
+  }
   if (asciiMode.value) updateAsciiText();
+}
+
+async function ensureVideoPalette() {
+  if (
+    scene.value.flattenColors.enabled &&
+    mediaKind.value === 'video' &&
+    video.value?.videoWidth &&
+    Number.isFinite(video.value.duration)
+  ) {
+    await renderer.value?.prepareVideoPalette(video.value);
+    if (asciiMode.value) updateAsciiText();
+  }
 }
 
 watch(asciiMode, (enabled) => {
@@ -296,6 +318,7 @@ function exportBaseName() {
 async function buildExportDocument() {
   if (asciiDocument.value) return asciiDocument.value;
   if (!renderer.value || !mediaFile.value) throw new Error('Carica prima un’immagine o un video.');
+  await ensureVideoPalette();
   const wasPlaying = mediaKind.value === 'video' && !video.value.paused;
   if (wasPlaying) pauseVideo();
   const controller = new AbortController();
@@ -734,6 +757,47 @@ function onKeydown(event) {
                 step="0.01"
               />
             </template>
+          </template>
+        </section>
+        <section class="inspector-section flatten-section">
+          <div class="section-title">
+            <span class="section-icon">▦</span>
+            <h2>Flatten Colors</h2>
+            <span class="section-line" />
+          </div>
+          <label class="check-row">
+            <input v-model="scene.flattenColors.enabled" type="checkbox" /> Enable color flattening
+          </label>
+          <template v-if="scene.flattenColors.enabled">
+            <label class="field-label" for="flatten-color-count"
+              >Numero di colori <output>{{ scene.flattenColors.colorCount }}</output></label
+            >
+            <input
+              id="flatten-color-count"
+              v-model.number="scene.flattenColors.colorCount"
+              type="range"
+              min="2"
+              max="64"
+              step="1"
+            />
+            <p class="filter-help">
+              Riduce la palette globale e uniforma le campiture; non aggiunge dithering.
+            </p>
+            <label class="field-label" for="flatten-smoothing"
+              >Smoothing <output>{{ scene.flattenColors.smoothing }}</output></label
+            >
+            <input
+              id="flatten-smoothing"
+              v-model.number="scene.flattenColors.smoothing"
+              type="range"
+              min="0"
+              max="10"
+              step="1"
+            />
+            <p class="filter-help">
+              Bilaterale: attenua texture e variazioni locali preservando i contorni. Non cambia il
+              numero di colori.
+            </p>
           </template>
         </section>
         <div class="sidebar-footer">

@@ -155,6 +155,14 @@ function createDocument({ kind, scene, firstPage, audio }) {
           },
         ),
       ),
+      flattenColors: {
+        ...(scene.flattenColors ?? {
+          enabled: false,
+          colorCount: 16,
+          smoothing: 4,
+        }),
+        palette: firstPage.capture.palette ?? [],
+      },
     },
     render: {
       columns,

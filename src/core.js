@@ -24,6 +24,7 @@ export const DEFAULT_SCENE = Object.freeze({
     mode: 'edges',
     intensity: 0.65,
   },
+  flattenColors: { enabled: false, colorCount: 16, smoothing: 4 },
   playback: { loop: true, autoplay: false, muted: false, volume: 1 },
 });
 
@@ -36,6 +37,7 @@ export function validateScene(scene) {
   const contrast = Number(scene?.appearance?.contrast);
   const gamma = Number(scene?.appearance?.gamma);
   const edge = scene?.edgeDetection ?? DEFAULT_SCENE.edgeDetection;
+  const flatten = scene?.flattenColors ?? DEFAULT_SCENE.flattenColors;
   if (!Number.isInteger(columns) || columns < 16 || columns > 320)
     throw new Error('La griglia deve avere da 16 a 320 colonne.');
   if (!Number.isInteger(maxCells) || maxCells < columns || maxCells > 100000)
@@ -73,6 +75,16 @@ export function validateScene(scene) {
     edge.intensity > 1
   )
     throw new Error('Impostazioni Edge Detection non valide.');
+  if (
+    typeof flatten?.enabled !== 'boolean' ||
+    !Number.isInteger(flatten.colorCount) ||
+    flatten.colorCount < 2 ||
+    flatten.colorCount > 64 ||
+    !Number.isInteger(flatten.smoothing) ||
+    flatten.smoothing < 0 ||
+    flatten.smoothing > 10
+  )
+    throw new Error('Impostazioni Flatten Colors non valide.');
   for (const value of [scene.appearance.foreground, scene.appearance.background]) {
     if (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value))
       throw new Error('I colori devono essere valori esadecimali #RRGGBB.');

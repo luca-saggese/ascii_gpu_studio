@@ -1,5 +1,12 @@
 import { coverageOrder, DEFAULT_SCENE, gridForSource, validateScene } from './core.js';
 import { createEdgeMap } from './edge-detection.js';
+import {
+  buildColorPalette,
+  collectVideoColorSamples,
+  flattenPixelData,
+  paletteAsHex,
+  sampleSourceColors,
+} from './flatten-colors.js';
 
 const vertex = `#version 300 es
 in vec2 position;
@@ -28,10 +35,68 @@ uniform float edgeThreshold;
 uniform float edgeSmoothing;
 uniform float edgeMode;
 uniform float edgeIntensity;
+uniform float flattenEnabled;
+uniform float flattenSmoothing;
+uniform float paletteCount;
 uniform vec3 foreground;
 uniform vec3 background;
 uniform float fitMode;
+uniform sampler2D paletteTex;
 float lum(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+vec3 linearRgb(vec3 c){
+  return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));
+}
+vec3 oklab(vec3 color){
+  vec3 c=linearRgb(color);
+  vec3 lms=vec3(
+    .4122214708*c.r+.5363325363*c.g+.0514459929*c.b,
+    .2119034982*c.r+.6806995451*c.g+.1073969566*c.b,
+    .0883024619*c.r+.2817188376*c.g+.6299787005*c.b
+  );
+  vec3 root=pow(max(lms,vec3(0.)),vec3(1./3.));
+  return vec3(
+    .2104542553*root.r+.793617785*root.g-.0040720468*root.b,
+    1.9779984951*root.r-2.428592205*root.g+.4505937099*root.b,
+    .0259040371*root.r+.782771766*root.g-.808675766*root.b
+  );
+}
+vec3 bilateralColor(vec3 center,vec2 point,vec2 edgeStep){
+  if(flattenSmoothing<.5) return center;
+  vec3 centerLab=oklab(center);
+  float sigmaSpatial=.8+flattenSmoothing*.12;
+  float sigmaColor=.025+flattenSmoothing*.018;
+  float total=1.;
+  vec3 colorTotal=center;
+  for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){
+    if(x==0&&y==0) continue;
+    vec2 delta=vec2(float(x),float(y));
+    vec2 samplePoint=point+delta*edgeStep*(.5+flattenSmoothing*.12);
+    vec3 sampleColor=texture(sourceTex,clamp(samplePoint,vec2(0.),vec2(1.))).rgb;
+    vec3 colorDelta=oklab(sampleColor)-centerLab;
+    float weight=exp(-dot(delta,delta)/(2.*sigmaSpatial*sigmaSpatial)
+      -dot(colorDelta,colorDelta)/(2.*sigmaColor*sigmaColor));
+    colorTotal+=sampleColor*weight;
+    total+=weight;
+  }
+  return colorTotal/total;
+}
+vec3 flattenColor(vec3 color,vec2 point,vec2 edgeStep){
+  vec3 smoothed=bilateralColor(color,point,edgeStep);
+  vec3 lab=oklab(smoothed);
+  vec3 nearest=texture(paletteTex,vec2(.5/64.,.5)).rgb;
+  float minDistance=1.e6;
+  for(int i=0;i<64;i++){
+    if(float(i)>=paletteCount) break;
+    vec3 candidate=texture(paletteTex,vec2((float(i)+.5)/64.,.5)).rgb;
+    vec3 delta=lab-oklab(candidate);
+    float distance=dot(delta,delta);
+    if(distance<minDistance){
+      minDistance=distance;
+      nearest=candidate;
+    }
+  }
+  return nearest;
+}
 float blurredLum(vec2 point){
   if(edgeSmoothing<.5) return lum(texture(sourceTex,clamp(point,vec2(0.),vec2(1.))).rgb);
   float spread=edgeSmoothing*.5;
@@ -67,6 +132,8 @@ void main(){
     vec2 offset=(vec2(float(x),float(y))-1.)/gridSize/3.;
     avg+=texture(sourceTex,clamp(sampleUv+offset,vec2(0.),vec2(1.))).rgb/9.;
   }
+  vec2 sampleStep=1./gridSize/scale;
+  if(flattenEnabled>.5&&paletteCount>0.) avg=flattenColor(avg,sampleUv,sampleStep);
   float luminance=lum(avg);
   if(edgeEnabled>.5){
     float edge=edgeMagnitude(sampleUv,1./gridSize/scale);
@@ -123,6 +190,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   const sourceTex = gl.createTexture();
   const atlasTex = gl.createTexture();
+  const paletteTex = gl.createTexture();
   const locations = Object.fromEntries(
     [
       'sourceTex',
@@ -143,18 +211,28 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       'edgeSmoothing',
       'edgeMode',
       'edgeIntensity',
+      'flattenEnabled',
+      'flattenSmoothing',
+      'paletteCount',
       'foreground',
       'background',
       'fitMode',
+      'paletteTex',
     ].map((name) => [name, gl.getUniformLocation(program, name)]),
   );
   let source = null;
   const cloneScene = (value) => JSON.parse(JSON.stringify(value));
   let currentScene = cloneScene(scene);
+  currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
+  currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
   let atlas = null;
   let disposed = false;
   let lastStats = '';
   let textCanvas = null;
+  let paletteSamples = [];
+  let palette = [];
+  let palettePromise = null;
+  let sourceGeneration = 0;
   const tile = { width: 1, height: 1 };
   let atlasScale = 1;
   const fontSize = 20;
@@ -166,6 +244,33 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       locations[name],
       ...values,
     );
+
+  function rebuildPalette() {
+    palette = buildColorPalette(
+      paletteSamples,
+      currentScene.flattenColors.colorCount,
+      currentScene.flattenColors.smoothing,
+    );
+    if (!palette.length) return;
+    const pixels = new Uint8Array(64 * 4);
+    for (let index = 0; index < 64; index += 1) {
+      const color = palette[Math.min(index, palette.length - 1)];
+      pixels.set([...color, 255], index * 4);
+    }
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, paletteTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  }
+
+  function setPaletteSamples(samples) {
+    paletteSamples = samples;
+    rebuildPalette();
+    renderFrame();
+  }
 
   function makeAtlas() {
     const chars = coverageOrder(
@@ -263,6 +368,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
     gl.uniform1i(locations.sourceTex, 0);
     gl.uniform1i(locations.atlasTex, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, paletteTex);
+    gl.uniform1i(locations.paletteTex, 2);
     setUniforms('sourceSize', width, height);
     setUniforms('outputSize', canvas.width, canvas.height);
     setUniforms('gridSize', grid.columns, grid.rows);
@@ -275,11 +383,15 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     setUniforms('invertValue', currentScene.appearance.invert ? 1 : 0);
     setUniforms('rgbMode', currentScene.appearance.mode === 'rgb' ? 1 : 0);
     currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
+    currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
     setUniforms('edgeEnabled', currentScene.edgeDetection.enabled ? 1 : 0);
     setUniforms('edgeThreshold', currentScene.edgeDetection.threshold / 255);
     setUniforms('edgeSmoothing', currentScene.edgeDetection.smoothing);
     setUniforms('edgeMode', currentScene.edgeDetection.mode === 'edges' ? 0 : 1);
     setUniforms('edgeIntensity', currentScene.edgeDetection.intensity);
+    setUniforms('flattenEnabled', currentScene.flattenColors.enabled ? 1 : 0);
+    setUniforms('flattenSmoothing', currentScene.flattenColors.smoothing);
+    setUniforms('paletteCount', palette.length);
     setUniforms('foreground', ...color(currentScene.appearance.foreground));
     setUniforms('background', ...color(currentScene.appearance.background));
     setUniforms(
@@ -299,6 +411,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     canvas.dataset.renderHeight = String(canvas.height);
     canvas.dataset.renderScale = String(renderScale);
     canvas.dataset.atlasScale = String(atlasScale);
+    canvas.dataset.paletteSize = String(palette.length);
     const statsKey = `${grid.columns}x${grid.rows}:${outWidth}x${outHeight}`;
     if (statsKey !== lastStats) {
       lastStats = statsKey;
@@ -329,7 +442,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       Math.min(grid.rows, Math.floor(currentScene.grid.maxCells / grid.columns)),
     );
     if (!textCanvas) textCanvas = document.createElement('canvas');
-    const sampleScale = currentScene.edgeDetection?.enabled ? 2 : 1;
+    const sampleScale =
+      currentScene.edgeDetection?.enabled || currentScene.flattenColors?.enabled ? 2 : 1;
     const sampleWidth = grid.columns * sampleScale;
     const sampleHeight = grid.rows * sampleScale;
     textCanvas.width = sampleWidth;
@@ -353,11 +467,17 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         drawHeight,
       );
     }
-    const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
-    const edges =
-      sampleScale > 1
-        ? createEdgeMap(pixels, sampleWidth, sampleHeight, currentScene.edgeDetection)
-        : null;
+    const rawPixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+    const pixels = currentScene.flattenColors?.enabled
+      ? flattenPixelData(
+          { data: rawPixels, width: sampleWidth, height: sampleHeight },
+          currentScene.flattenColors,
+          palette,
+        ).data
+      : rawPixels;
+    const edges = currentScene.edgeDetection?.enabled
+      ? createEdgeMap(rawPixels, sampleWidth, sampleHeight, currentScene.edgeDetection, pixels)
+      : null;
     const glyphs = atlas.chars;
     let text = '';
     const cellColors = currentScene.appearance.mode === 'rgb' ? [] : null;
@@ -406,6 +526,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       ascent: tile.ascent,
       descent: tile.descent,
       cellColors,
+      palette: currentScene.flattenColors?.enabled ? paletteAsHex(palette) : [],
     };
   }
 
@@ -413,16 +534,47 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   return {
     setSource(value) {
       source = value;
+      sourceGeneration += 1;
+      palettePromise = null;
+      paletteSamples = [];
+      palette = [];
+      if (value?.naturalWidth) {
+        try {
+          setPaletteSamples([sampleSourceColors(value)]);
+        } catch (error) {
+          onError(error);
+        }
+      }
       renderFrame();
+    },
+    async prepareVideoPalette(video) {
+      if (paletteSamples.length) return paletteAsHex(palette);
+      if (palettePromise) return palettePromise;
+      const generation = sourceGeneration;
+      const pending = collectVideoColorSamples(video).then((samples) => {
+        if (generation === sourceGeneration) setPaletteSamples(samples);
+        return generation === sourceGeneration ? paletteAsHex(palette) : [];
+      });
+      palettePromise = pending;
+      try {
+        return await pending;
+      } finally {
+        if (palettePromise === pending) palettePromise = null;
+      }
     },
     setScene(value) {
       validateScene(value);
       const before = JSON.stringify(currentScene.typography);
+      const beforeFlatten = JSON.stringify(currentScene.flattenColors);
       currentScene = cloneScene(value);
       currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
+      currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
       if (before !== JSON.stringify(currentScene.typography)) makeAtlas();
+      if (beforeFlatten !== JSON.stringify(currentScene.flattenColors) && paletteSamples.length)
+        rebuildPalette();
       renderFrame();
     },
+    getPalette: () => paletteAsHex(palette),
     resize: renderFrame,
     renderFrame,
     captureText,
@@ -442,6 +594,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       disposed = true;
       gl.deleteTexture(sourceTex);
       gl.deleteTexture(atlasTex);
+      gl.deleteTexture(paletteTex);
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);

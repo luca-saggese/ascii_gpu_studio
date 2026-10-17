@@ -16,6 +16,12 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
       "smoothing": 0,
       "mode": "edges",
       "intensity": 0.65
+    },
+    "flattenColors": {
+      "enabled": false,
+      "colorCount": 16,
+      "smoothing": 4,
+      "palette": []
     }
   },
   "render": {
@@ -57,6 +63,8 @@ Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. The 
 The serialization and validation boundary lives in `src/ascii-document.js`; image/video frame capture is in `src/ascii-export.js`. Full-frame pages are used in v1 so a future version can introduce delta frames or chunk compression behind the same reader/player boundary.
 
 `filters.edgeDetection` records the settings used to make the pages. The pages already contain the filtered ASCII result; readers and the offline HTML player display them directly and do not rerun edge detection.
+
+`filters.flattenColors` stores the selected color count, bilateral smoothing strength, and the palette as hexadecimal sRGB colors. Video palettes are sampled globally from six evenly spaced frames and held fixed for the entire sequence. In RGB mode, each cell's stored color is selected from this palette, so the HTML player reproduces the flat colors without rerunning quantization.
 
 ## Legacy import
 

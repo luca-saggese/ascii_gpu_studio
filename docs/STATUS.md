@@ -6,7 +6,7 @@ Latest verified implementation commit: `e835d84` (`fix(renderer): sample complet
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification: `pnpm lint`, `pnpm test` (10 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (8 tests) all pass. The PNG worker issue after importing a gzip `.ascii` document was fixed by posting plain data rather than Vue reactive proxies.
+Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (11 tests) all pass. The PNG worker issue after importing a gzip `.ascii` document was fixed by posting plain data rather than Vue reactive proxies.
 
 ## Works now
 
@@ -15,6 +15,7 @@ Latest verification: `pnpm lint`, `pnpm test` (10 tests), `pnpm build`, `pnpm fo
 - Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
+- Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM audio, and compact per-cell RGB. Legacy ZIP projects remain importable.

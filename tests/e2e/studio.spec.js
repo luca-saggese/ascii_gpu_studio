@@ -316,6 +316,87 @@ test('applies Sobel edge detection live and stores its settings with converted p
   expect(exported.frames[0].text).toMatch(/\S/);
 });
 
+test('flattens image colors to a reduced perceptual palette in preview and ASCII export', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 96;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    const gradient = context.createLinearGradient(0, 0, 96, 64);
+    gradient.addColorStop(0, '#ef2424');
+    gradient.addColorStop(0.5, '#22ca68');
+    gradient.addColorStop(1, '#285ee8');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 96, 64);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'color-flatten.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+  await page.getByRole('button', { name: 'Source color' }).click();
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  const original = await canvas.evaluate((element) => element.toDataURL());
+  await page.getByLabel('Enable color flattening').check();
+  await expect.poll(() => canvas.getAttribute('data-palette-size')).toBe('16');
+  await expect.poll(() => canvas.evaluate((element) => element.toDataURL())).not.toBe(original);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const bytes = await readFile(await (await download).path());
+  const exported = JSON.parse(strFromU8(gunzipSync(bytes)));
+  const flatten = exported.filters.flattenColors;
+  expect(flatten).toMatchObject({ enabled: true, colorCount: 16, smoothing: 4 });
+  expect(flatten.palette).toHaveLength(16);
+  expect(exported.frames[0].colors).toBeTruthy();
+  const cellColors = Buffer.from(exported.frames[0].colors, 'base64');
+  const palette = new Set(
+    flatten.palette.map((hex) =>
+      hex
+        .match(/[0-9a-f]{2}/gi)
+        .map((byte) => parseInt(byte, 16))
+        .join(','),
+    ),
+  );
+  for (let offset = 0; offset < cellColors.length; offset += 3)
+    expect(palette.has([...cellColors.subarray(offset, offset + 3)].join(','))).toBe(true);
+});
+
+test('keeps one globally sampled palette across video frames', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/video-silent.webm');
+  await expect(page.locator('video.media-source')).toHaveJSProperty('videoWidth', 160);
+  await page.getByRole('button', { name: 'Source color' }).click();
+  await page.getByLabel('Enable color flattening').check();
+  const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  await expect.poll(() => canvas.getAttribute('data-palette-size'), { timeout: 15000 }).toBe('16');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const bytes = await readFile(await (await download).path());
+  const exported = JSON.parse(strFromU8(gunzipSync(bytes)));
+  const palette = exported.filters.flattenColors.palette;
+  expect(palette).toHaveLength(16);
+  expect(exported.frames.length).toBeGreaterThan(1);
+  const paletteSet = new Set(
+    palette.map((hex) =>
+      hex
+        .match(/[0-9a-f]{2}/gi)
+        .map((byte) => parseInt(byte, 16))
+        .join(','),
+    ),
+  );
+  for (const frame of exported.frames) {
+    const colors = Buffer.from(frame.colors, 'base64');
+    for (let offset = 0; offset < colors.length; offset += 3)
+      expect(paletteSet.has([...colors.subarray(offset, offset + 3)].join(','))).toBe(true);
+  }
+});
+
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {
   await page.goto('/');
   const malformedArchive = zipSync({

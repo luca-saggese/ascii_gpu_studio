@@ -222,6 +222,13 @@ select:focus-visible {
   background: var(--panel, #101715);
   font: inherit;
 }
+
+.filter-help {
+  margin: 6px 0 12px;
+  color: #78847f;
+  font-size: 10px;
+  line-height: 1.5;
+}
 .icon-button {
   border: 0;
   background: transparent;

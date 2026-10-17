@@ -10,18 +10,19 @@
 - Old ZIP `.ascii` projects still import. New `.ascii` exports do not contain their original image/video or thumbnails.
 - Edge Detection is available before conversion: fixed-scale Sobel over luminance, configurable threshold and Gaussian smoothing, Solo bordi and Bordi + immagine modes, adjustable blend intensity, and preserved source colors in RGB mode. The live preview evaluates it in WebGL2. ASCII capture oversamples at 2× grid resolution; exported frame pages are already filtered, and `.ascii` stores the chosen settings as metadata for inspection only.
 - Save defaults persists the complete validated scene locally; Studio startup and Reset settings restore it. Storage or invalid-data errors are surfaced instead of silently ignored.
+- Flatten Colors uses bilateral smoothing and OKLab palette assignment (2–64 colors, default 16), with no dithering. A video palette is sampled from six distributed timestamps and held for the clip. Preview and ASCII capture use the same fixed palette; in RGB mode final cell colors are palette entries, saved alongside palette/settings metadata so offline HTML does not recalculate the filter.
 
 ## Verified
 
-| Check               | Result                    |
-| ------------------- | ------------------------- |
-| `pnpm lint`         | Passed                    |
-| `pnpm test`         | Passed — 10 tests         |
-| `pnpm build`        | Passed                    |
-| `pnpm format:check` | Passed                    |
-| `pnpm test:e2e`     | Passed — 8 Chromium tests |
+| Check               | Result                     |
+| ------------------- | -------------------------- |
+| `pnpm lint`         | Passed                     |
+| `pnpm test`         | Passed — 12 tests          |
+| `pnpm build`        | Passed                     |
+| `pnpm format:check` | Passed                     |
+| `pnpm test:e2e`     | Passed — 11 Chromium tests |
 
-E2E covers live Edge Detection preview and metadata, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
+E2E covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
 
 ## MP4 limitation — explicit
 

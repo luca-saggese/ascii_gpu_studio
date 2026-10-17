@@ -39,7 +39,7 @@ export function edgeMagnitude(data, width, height, x, y, smoothing = 0) {
   return Math.min(1, Math.hypot(gx, gy) / Math.SQRT2 / 4);
 }
 
-export function createEdgeMap(data, width, height, options) {
+export function createEdgeMap(data, width, height, options, basePixels = data) {
   const { threshold, smoothing, mode, intensity } = options;
   const thresholdValue = threshold / 255;
   const edgeMap = new Float32Array(width * height);
@@ -54,7 +54,10 @@ export function createEdgeMap(data, width, height, options) {
     const edge = edgeMap[i];
     const offset = i * 4;
     const sourceLuminance =
-      (data[offset] * 0.2126 + data[offset + 1] * 0.7152 + data[offset + 2] * 0.0722) / 255;
+      (basePixels[offset] * 0.2126 +
+        basePixels[offset + 1] * 0.7152 +
+        basePixels[offset + 2] * 0.0722) /
+      255;
     values[i] = mode === 'edges' ? 1 - edge : sourceLuminance * (1 - edge * intensity);
   }
   return values;
