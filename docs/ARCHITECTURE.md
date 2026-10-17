@@ -14,6 +14,8 @@ The glyph atlas uses a fixed 20 px internal font size and is rasterized at 4× d
 
 The **Save defaults** action stores the validated Studio scene (grid, typography, appearance, edge filter, and playback parameters) in browser `localStorage`. Startup initializes controls from those saved defaults; reset restores the saved set, or application defaults when none have been saved. Invalid or inaccessible saved data is reported in the UI rather than silently accepted.
 
+The inspector keeps its heading and privacy footer fixed while a dedicated inner region scrolls; the application shell remains viewport-height and does not grow with the control list. Source, typography, appearance, Edge Detection, and Flatten Colors use native collapsible `details` groups. Edge display mode is a standard select with explicit options.
+
 Exports share a versioned ASCII result model. `src/ascii-export.js` samples video on a fixed 100 ms seek timeline (not preview callbacks), optionally records its native audio track, and builds full text/color pages. `src/ascii-document.js` validates and serializes that model as gzip JSON. `src/ascii-render.js` rasterizes a page to the configured cell dimensions for PNG (OffscreenCanvas worker where supported); `src/templates/playable-template.js` embeds the same compressed model and renderer in a standalone offline HTML player.
 
 MP4 output is surfaced in the menu for video sources but is rejected with an explicit capability error unless a deterministic encoder and MP4 muxer are available. The tested Chromium exposes real-time `MediaRecorder` MP4 but not WebCodecs; a real-time recorder cannot guarantee the deterministic frame timeline, so it is deliberately not used as an MP4 fallback.

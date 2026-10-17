@@ -6,7 +6,7 @@ Latest verified implementation commit: `e835d84` (`fix(renderer): sample complet
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (11 tests) all pass. The PNG worker issue after importing a gzip `.ascii` document was fixed by posting plain data rather than Vue reactive proxies.
+Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (12 tests) all pass. The PNG worker issue after importing a gzip `.ascii` document was fixed by posting plain data rather than Vue reactive proxies.
 
 ## Works now
 
@@ -17,6 +17,7 @@ Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm fo
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
 - Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.
+- Settings live in a fixed-height inspector with its own scroll region. Source, Typography, Appearance, Edge Detection, and Flatten Colors groups are collapsible; Edge Detection mode uses a select with Solo bordi and Bordi + immagine options.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM audio, and compact per-cell RGB. Legacy ZIP projects remain importable.
 - A single keyboard-accessible Export dropdown offers ASCII, contextual PNG/MP4, and standalone offline HTML. It supports Escape/outside click and reports cancellable progress for video conversion.
@@ -24,7 +25,7 @@ Latest verification: `pnpm lint`, `pnpm test` (12 tests), `pnpm build`, `pnpm fo
 - Offline HTML includes the gzip payload, renderer, custom controls, seeking and audio; no network assets are requested.
 - Vue `AsciiPlayer` example loads a real package and renders it.
 - MP4 is intentionally not emitted in this environment: Chromium reports MediaRecorder MP4 support but has no WebCodecs, and a verified MP4 muxer is not bundled. The UI reports this accurately instead of making a nondeterministic real-time recording.
-- Chromium E2E covers live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, MP4 capability errors, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
+- Chromium E2E covers the panel's bounded scrolling and collapsible groups, live Sobel preview and settings metadata, image RGB ASCII/PNG/HTML parity, video frame timings with and without audio, HTML audio playback/seek offline, MP4 capability errors, menu behavior, legacy ZIP traversal rejection, Vue runtime, and native playback controls.
 
 ## Does not work / not claimed
 

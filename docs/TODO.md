@@ -18,6 +18,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-058 [P1] Add fixed-scale Sobel Edge Detection with configurable smoothing, threshold, solo-edge/image blend modes, live WebGL preview, 2× grid ASCII conversion, and `.ascii` filter metadata; lint, unit, build, format, and Chromium E2E pass.
 - [x] AGPU-059 [P1] Save and persist the current full parameter set as browser defaults; startup and Reset settings restore it, covered by Chromium reload/reset E2E.
 - [x] AGPU-060 [P1] Add Flatten Colors with bilateral smoothing, 2–64-color OKLab palette reduction, one fixed global palette sampled across six video timestamps, live GPU quantization, palette-only RGB cell colors, and `.ascii` metadata; unit and Chromium image/video E2E cover output.
+- [x] AGPU-061 [P1] Constrain settings to an independently scrolling inspector, make all five groups collapsible, and select Edge Detection mode from explicit options; verified with responsive Chromium E2E.
 
 ## In progress
 

@@ -41,14 +41,17 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
 .studio {
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .topbar {
   height: 62px;
@@ -250,16 +253,28 @@ select:focus-visible {
 .workspace {
   display: grid;
   grid-template-columns: 310px minmax(0, 1fr);
+  height: 0;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 .sidebar {
   background: var(--panel);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 62px);
-  overflow: auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-color: #35413d transparent;
+  scrollbar-width: thin;
 }
 .panel-heading {
   padding: 25px 22px 20px;
@@ -292,6 +307,26 @@ select:focus-visible {
   padding: 0 22px 20px;
   margin-bottom: 18px;
   border-bottom: 1px solid #202727;
+}
+.inspector-section > .section-title {
+  list-style: none;
+  cursor: pointer;
+}
+.inspector-section > .section-title::-webkit-details-marker {
+  display: none;
+}
+.inspector-section > .section-title::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-right: 1px solid #82908a;
+  border-bottom: 1px solid #82908a;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 120ms ease;
+}
+.inspector-section[open] > .section-title::after {
+  transform: rotate(225deg) translate(-1px, -1px);
 }
 .section-title {
   display: flex;
@@ -929,11 +964,13 @@ input[type='range'] {
   .workspace {
     display: block;
     position: relative;
-    min-height: calc(100dvh - 100px);
+    height: calc(100dvh - 100px);
+    min-height: 0;
+    flex: none;
   }
   .sidebar,
   .stage-column {
-    height: calc(100dvh - 100px);
+    height: 100%;
     min-height: 0;
   }
   .sidebar {

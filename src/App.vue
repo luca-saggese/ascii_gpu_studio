@@ -551,255 +551,256 @@ function onKeydown(event) {
             <button class="icon-button small" title="Reset settings" @click="resetScene">↻</button>
           </div>
         </div>
-        <section class="inspector-section">
-          <div class="section-title">
-            <span class="section-icon">▧</span>
-            <h2>Source</h2>
-            <span class="section-line" />
-          </div>
-          <button v-if="!hasContent" class="source-drop" @click="picker?.click()">
-            <span class="upload-icon">↑</span><strong>Choose a file</strong
-            ><span>Image or video · up to 100 MB</span>
-          </button>
-          <div v-else class="source-card">
-            <span class="file-icon">{{ mediaKind === 'video' ? '▶' : '▧' }}</span
-            ><span class="source-meta"
-              ><strong>{{ mediaName }}</strong
-              ><small
-                >{{ mediaSize.width }} × {{ mediaSize.height }} ·
-                {{
-                  mediaFile ? `${(mediaFile.size / 1048576).toFixed(1)} MB` : 'ASCII document'
-                }}</small
-              ></span
-            ><button class="icon-button small" aria-label="Replace source" @click="picker?.click()">
-              ↻
+        <div class="settings-scroll">
+          <details class="inspector-section" open>
+            <summary class="section-title">
+              <span class="section-icon">▧</span>
+              <h2>Source</h2>
+              <span class="section-line" />
+            </summary>
+            <button v-if="!hasContent" class="source-drop" @click="picker?.click()">
+              <span class="upload-icon">↑</span><strong>Choose a file</strong
+              ><span>Image or video · up to 100 MB</span>
             </button>
-          </div>
-          <div class="control-row">
-            <label for="fit">Fit mode</label
-            ><select id="fit" v-model="scene.appearance.fit">
-              <option value="contain">Contain</option>
-              <option value="cover">Cover</option>
-              <option value="stretch">Stretch</option>
-            </select>
-          </div>
-        </section>
-        <section class="inspector-section">
-          <div class="section-title">
-            <span class="section-icon">▤</span>
-            <h2>Typography</h2>
-            <span class="section-line" />
-          </div>
-          <div class="control-row">
-            <label for="font">Typeface</label
-            ><select id="font" v-model="scene.typography.fontFamily">
-              <option value="monospace">System Mono</option>
-              <option value="Courier New">Courier New</option>
-              <option value="ui-monospace">UI Monospace</option>
-              <option value="serif">Serif</option>
-            </select>
-          </div>
-          <div class="control-row">
-            <label for="charset">Character set</label
-            ><select
-              id="charset"
-              :value="scene.typography.charset"
-              @change="scene.typography.charset = $event.target.value"
-            >
-              <option value=" .:-=+*#%@">Classic</option>
-              <option value=" .,:;irsXA253hMHGS#9B&@">Detailed</option>
-              <option value=" ░▒▓█">Blocks</option>
-              <option value=" 01">Binary</option>
-            </select>
-          </div>
-          <label class="field-label" for="columns"
-            >Columns <output>{{ scene.grid.columns }}</output></label
-          >
-          <input
-            id="columns"
-            v-model.number="scene.grid.columns"
-            type="range"
-            min="32"
-            max="320"
-            step="1"
-          />
-          <div class="range-ends"><span>32</span><span>320</span></div>
-        </section>
-        <section class="inspector-section">
-          <div class="section-title">
-            <span class="section-icon">◐</span>
-            <h2>Appearance</h2>
-            <span class="section-line" />
-          </div>
-          <div class="mode-switch" role="group" aria-label="Color mode">
-            <button
-              :class="{ selected: scene.appearance.mode === 'mono' }"
-              @click="scene.appearance.mode = 'mono'"
-            >
-              Monochrome</button
-            ><button
-              :class="{ selected: scene.appearance.mode === 'rgb' }"
-              @click="scene.appearance.mode = 'rgb'"
-            >
-              Source color
-            </button>
-          </div>
-          <div class="color-row">
-            <label for="foreground">Ink color</label>
-            <div class="color-control">
-              <input id="foreground" v-model="scene.appearance.foreground" type="color" /><code>{{
-                scene.appearance.foreground.toUpperCase()
-              }}</code>
+            <div v-else class="source-card">
+              <span class="file-icon">{{ mediaKind === 'video' ? '▶' : '▧' }}</span
+              ><span class="source-meta"
+                ><strong>{{ mediaName }}</strong
+                ><small
+                  >{{ mediaSize.width }} × {{ mediaSize.height }} ·
+                  {{
+                    mediaFile ? `${(mediaFile.size / 1048576).toFixed(1)} MB` : 'ASCII document'
+                  }}</small
+                ></span
+              ><button
+                class="icon-button small"
+                aria-label="Replace source"
+                @click="picker?.click()"
+              >
+                ↻
+              </button>
             </div>
-          </div>
-          <div class="color-row">
-            <label for="background">Canvas</label>
-            <div class="color-control">
-              <input id="background" v-model="scene.appearance.background" type="color" /><code>{{
-                scene.appearance.background.toUpperCase()
-              }}</code>
+            <div class="control-row">
+              <label for="fit">Fit mode</label
+              ><select id="fit" v-model="scene.appearance.fit">
+                <option value="contain">Contain</option>
+                <option value="cover">Cover</option>
+                <option value="stretch">Stretch</option>
+              </select>
             </div>
-          </div>
-          <label class="field-label" for="contrast"
-            >Contrast <output>{{ scene.appearance.contrast.toFixed(1) }}</output></label
-          ><input
-            id="contrast"
-            v-model.number="scene.appearance.contrast"
-            type="range"
-            min="0.2"
-            max="2.5"
-            step="0.1"
-          />
-          <label class="field-label" for="brightness"
-            >Brightness
-            <output
-              >{{ scene.appearance.brightness > 0 ? '+' : ''
-              }}{{ scene.appearance.brightness.toFixed(2) }}</output
-            ></label
-          ><input
-            id="brightness"
-            v-model.number="scene.appearance.brightness"
-            type="range"
-            min="-0.5"
-            max="0.5"
-            step="0.02"
-          />
-          <label class="check-row"
-            ><input v-model="scene.appearance.invert" type="checkbox" /> Invert luminance</label
-          >
-        </section>
-        <section class="inspector-section edge-section">
-          <div class="section-title">
-            <span class="section-icon">⌁</span>
-            <h2>Edge Detection</h2>
-          </div>
-          <label class="check-row">
-            <input v-model="scene.edgeDetection.enabled" type="checkbox" /> Enable edge detection
-          </label>
-          <template v-if="scene.edgeDetection.enabled">
-            <label class="field-label" for="edge-threshold"
-              >Threshold <output>{{ scene.edgeDetection.threshold }}</output></label
-            >
-            <div class="edge-threshold">
-              <input
-                id="edge-threshold"
-                v-model.number="scene.edgeDetection.threshold"
-                type="range"
-                min="0"
-                max="255"
-                step="1"
-              />
-              <input
-                v-model.number="scene.edgeDetection.threshold"
-                aria-label="Threshold value"
-                type="number"
-                min="0"
-                max="255"
-                step="1"
-              />
+          </details>
+          <details class="inspector-section" open>
+            <summary class="section-title">
+              <span class="section-icon">▤</span>
+              <h2>Typography</h2>
+              <span class="section-line" />
+            </summary>
+            <div class="control-row">
+              <label for="font">Typeface</label
+              ><select id="font" v-model="scene.typography.fontFamily">
+                <option value="monospace">System Mono</option>
+                <option value="Courier New">Courier New</option>
+                <option value="ui-monospace">UI Monospace</option>
+                <option value="serif">Serif</option>
+              </select>
             </div>
-            <label class="field-label" for="edge-smoothing"
-              >Smoothing <output>{{ scene.edgeDetection.smoothing || 'Off' }}</output></label
+            <div class="control-row">
+              <label for="charset">Character set</label
+              ><select
+                id="charset"
+                :value="scene.typography.charset"
+                @change="scene.typography.charset = $event.target.value"
+              >
+                <option value=" .:-=+*#%@">Classic</option>
+                <option value=" .,:;irsXA253hMHGS#9B&@">Detailed</option>
+                <option value=" ░▒▓█">Blocks</option>
+                <option value=" 01">Binary</option>
+              </select>
+            </div>
+            <label class="field-label" for="columns"
+              >Columns <output>{{ scene.grid.columns }}</output></label
             >
             <input
-              id="edge-smoothing"
-              v-model.number="scene.edgeDetection.smoothing"
+              id="columns"
+              v-model.number="scene.grid.columns"
               type="range"
-              min="0"
-              max="3"
+              min="32"
+              max="320"
               step="1"
             />
-            <div class="segmented-control" aria-label="Edge display mode">
+            <div class="range-ends"><span>32</span><span>320</span></div>
+          </details>
+          <details class="inspector-section" open>
+            <summary class="section-title">
+              <span class="section-icon">◐</span>
+              <h2>Appearance</h2>
+              <span class="section-line" />
+            </summary>
+            <div class="mode-switch" role="group" aria-label="Color mode">
               <button
-                :class="{ selected: scene.edgeDetection.mode === 'edges' }"
-                @click="scene.edgeDetection.mode = 'edges'"
+                :class="{ selected: scene.appearance.mode === 'mono' }"
+                @click="scene.appearance.mode = 'mono'"
               >
-                Solo bordi
-              </button>
-              <button
-                :class="{ selected: scene.edgeDetection.mode === 'image' }"
-                @click="scene.edgeDetection.mode = 'image'"
+                Monochrome</button
+              ><button
+                :class="{ selected: scene.appearance.mode === 'rgb' }"
+                @click="scene.appearance.mode = 'rgb'"
               >
-                Bordi + immagine
+                Source color
               </button>
             </div>
-            <template v-if="scene.edgeDetection.mode === 'image'">
-              <label class="field-label" for="edge-intensity"
-                >Intensità bordi
-                <output>{{ scene.edgeDetection.intensity.toFixed(2) }}</output></label
+            <div class="color-row">
+              <label for="foreground">Ink color</label>
+              <div class="color-control">
+                <input id="foreground" v-model="scene.appearance.foreground" type="color" /><code>{{
+                  scene.appearance.foreground.toUpperCase()
+                }}</code>
+              </div>
+            </div>
+            <div class="color-row">
+              <label for="background">Canvas</label>
+              <div class="color-control">
+                <input id="background" v-model="scene.appearance.background" type="color" /><code>{{
+                  scene.appearance.background.toUpperCase()
+                }}</code>
+              </div>
+            </div>
+            <label class="field-label" for="contrast"
+              >Contrast <output>{{ scene.appearance.contrast.toFixed(1) }}</output></label
+            ><input
+              id="contrast"
+              v-model.number="scene.appearance.contrast"
+              type="range"
+              min="0.2"
+              max="2.5"
+              step="0.1"
+            />
+            <label class="field-label" for="brightness"
+              >Brightness
+              <output
+                >{{ scene.appearance.brightness > 0 ? '+' : ''
+                }}{{ scene.appearance.brightness.toFixed(2) }}</output
+              ></label
+            ><input
+              id="brightness"
+              v-model.number="scene.appearance.brightness"
+              type="range"
+              min="-0.5"
+              max="0.5"
+              step="0.02"
+            />
+            <label class="check-row"
+              ><input v-model="scene.appearance.invert" type="checkbox" /> Invert luminance</label
+            >
+          </details>
+          <details class="inspector-section edge-section" open>
+            <summary class="section-title">
+              <span class="section-icon">⌁</span>
+              <h2>Edge Detection</h2>
+              <span class="section-line" />
+            </summary>
+            <label class="check-row">
+              <input v-model="scene.edgeDetection.enabled" type="checkbox" /> Enable edge detection
+            </label>
+            <template v-if="scene.edgeDetection.enabled">
+              <label class="field-label" for="edge-threshold"
+                >Threshold <output>{{ scene.edgeDetection.threshold }}</output></label
+              >
+              <div class="edge-threshold">
+                <input
+                  id="edge-threshold"
+                  v-model.number="scene.edgeDetection.threshold"
+                  type="range"
+                  min="0"
+                  max="255"
+                  step="1"
+                />
+                <input
+                  v-model.number="scene.edgeDetection.threshold"
+                  aria-label="Threshold value"
+                  type="number"
+                  min="0"
+                  max="255"
+                  step="1"
+                />
+              </div>
+              <label class="field-label" for="edge-smoothing"
+                >Smoothing <output>{{ scene.edgeDetection.smoothing || 'Off' }}</output></label
               >
               <input
-                id="edge-intensity"
-                v-model.number="scene.edgeDetection.intensity"
+                id="edge-smoothing"
+                v-model.number="scene.edgeDetection.smoothing"
                 type="range"
                 min="0"
-                max="1"
-                step="0.01"
+                max="3"
+                step="1"
               />
+              <div class="control-row">
+                <label for="edge-mode">Modalità bordi</label>
+                <select id="edge-mode" v-model="scene.edgeDetection.mode">
+                  <option value="edges">Solo bordi</option>
+                  <option value="image">Bordi + immagine</option>
+                </select>
+              </div>
+              <template v-if="scene.edgeDetection.mode === 'image'">
+                <label class="field-label" for="edge-intensity"
+                  >Intensità bordi
+                  <output>{{ scene.edgeDetection.intensity.toFixed(2) }}</output></label
+                >
+                <input
+                  id="edge-intensity"
+                  v-model.number="scene.edgeDetection.intensity"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                />
+              </template>
             </template>
-          </template>
-        </section>
-        <section class="inspector-section flatten-section">
-          <div class="section-title">
-            <span class="section-icon">▦</span>
-            <h2>Flatten Colors</h2>
-            <span class="section-line" />
-          </div>
-          <label class="check-row">
-            <input v-model="scene.flattenColors.enabled" type="checkbox" /> Enable color flattening
-          </label>
-          <template v-if="scene.flattenColors.enabled">
-            <label class="field-label" for="flatten-color-count"
-              >Numero di colori <output>{{ scene.flattenColors.colorCount }}</output></label
-            >
-            <input
-              id="flatten-color-count"
-              v-model.number="scene.flattenColors.colorCount"
-              type="range"
-              min="2"
-              max="64"
-              step="1"
-            />
-            <p class="filter-help">
-              Riduce la palette globale e uniforma le campiture; non aggiunge dithering.
-            </p>
-            <label class="field-label" for="flatten-smoothing"
-              >Smoothing <output>{{ scene.flattenColors.smoothing }}</output></label
-            >
-            <input
-              id="flatten-smoothing"
-              v-model.number="scene.flattenColors.smoothing"
-              type="range"
-              min="0"
-              max="10"
-              step="1"
-            />
-            <p class="filter-help">
-              Bilaterale: attenua texture e variazioni locali preservando i contorni. Non cambia il
-              numero di colori.
-            </p>
-          </template>
-        </section>
+          </details>
+          <details class="inspector-section flatten-section" open>
+            <summary class="section-title">
+              <span class="section-icon">▦</span>
+              <h2>Flatten Colors</h2>
+              <span class="section-line" />
+            </summary>
+            <label class="check-row">
+              <input v-model="scene.flattenColors.enabled" type="checkbox" /> Enable color
+              flattening
+            </label>
+            <template v-if="scene.flattenColors.enabled">
+              <label class="field-label" for="flatten-color-count"
+                >Numero di colori <output>{{ scene.flattenColors.colorCount }}</output></label
+              >
+              <input
+                id="flatten-color-count"
+                v-model.number="scene.flattenColors.colorCount"
+                type="range"
+                min="2"
+                max="64"
+                step="1"
+              />
+              <p class="filter-help">
+                Riduce la palette globale e uniforma le campiture; non aggiunge dithering.
+              </p>
+              <label class="field-label" for="flatten-smoothing"
+                >Smoothing <output>{{ scene.flattenColors.smoothing }}</output></label
+              >
+              <input
+                id="flatten-smoothing"
+                v-model.number="scene.flattenColors.smoothing"
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+              />
+              <p class="filter-help">
+                Bilaterale: attenua texture e variazioni locali preservando i contorni. Non cambia
+                il numero di colori.
+              </p>
+            </template>
+          </details>
+        </div>
         <div class="sidebar-footer">
           <span class="privacy-icon">◈</span
           ><span

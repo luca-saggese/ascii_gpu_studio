@@ -41,6 +41,28 @@ test('saves parameter defaults for reset and future sessions', async ({ page }) 
   await expect(page.getByLabel('Threshold value')).toHaveValue('91');
 });
 
+test('keeps settings scrolling inside the panel and makes every group collapsible', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+  const groups = page.locator('.inspector-section');
+  await expect(groups).toHaveCount(5);
+  const scrollMetrics = await page.locator('.settings-scroll').evaluate((element) => ({
+    overflowY: getComputedStyle(element).overflowY,
+    canScroll: element.scrollHeight > element.clientHeight,
+  }));
+  expect(scrollMetrics).toEqual({ overflowY: 'auto', canScroll: true });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
+  ).toBe(true);
+  const edgeGroup = groups.filter({ has: page.getByRole('heading', { name: 'Edge Detection' }) });
+  await edgeGroup.locator('summary').click();
+  await expect(edgeGroup).not.toHaveAttribute('open', '');
+  await edgeGroup.locator('summary').click();
+  await expect(edgeGroup).toHaveAttribute('open', '');
+});
+
 test('imports an image, renders through WebGL2, and exports the source project', async ({
   page,
 }, testInfo) => {
@@ -298,7 +320,7 @@ test('applies Sobel edge detection live and stores its settings with converted p
   await expect(page.getByLabel('Threshold value')).toHaveValue('56');
   await page.getByLabel('Threshold value').fill('12');
   await expect.poll(() => canvas.evaluate((element) => element.toDataURL())).not.toBe(original);
-  await page.getByRole('button', { name: 'Bordi + immagine' }).click();
+  await page.locator('#edge-mode').selectOption('image');
   await expect(page.getByLabel('Intensità bordi')).toBeVisible();
   await page.getByLabel('Intensità bordi').fill('0.9');
   const download = page.waitForEvent('download');

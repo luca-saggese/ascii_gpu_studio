@@ -20,7 +20,7 @@
 | `pnpm test`         | Passed — 12 tests          |
 | `pnpm build`        | Passed                     |
 | `pnpm format:check` | Passed                     |
-| `pnpm test:e2e`     | Passed — 11 Chromium tests |
+| `pnpm test:e2e`     | Passed — 12 Chromium tests |
 
 E2E covers live Edge Detection preview and metadata, flattened image quantization and palette-only cell colors, a single global palette shared across all video frames, image export in RGB mode, gzip JSON shape and absence of embedded source/thumbnail, PNG dimensions and sampled-pixel equality against the offline HTML render, HTML opened from a local file, menu visibility/close behavior, video timestamp ordering and end duration, video audio capture and offline playback/seek, and a video fixture with no audio.
 
