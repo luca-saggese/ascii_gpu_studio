@@ -59,6 +59,21 @@ export function renderAsciiPage(context, page, render) {
     context.fillStyle = color;
     context.fill(path, 'evenodd');
   }
+  if (mode === 'bw') {
+    const pixels = context.getImageData(0, 0, width, height);
+    for (let offset = 0; offset < pixels.data.length; offset += 4) {
+      const value =
+        pixels.data[offset] * 0.2126 +
+        pixels.data[offset + 1] * 0.7152 +
+        pixels.data[offset + 2] * 0.0722;
+      const channel = value >= 127.5 ? 255 : 0;
+      pixels.data[offset] = channel;
+      pixels.data[offset + 1] = channel;
+      pixels.data[offset + 2] = channel;
+      pixels.data[offset + 3] = 255;
+    }
+    context.putImageData(pixels, 0, 0);
+  }
   return context.canvas;
 }
 

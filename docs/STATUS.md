@@ -6,7 +6,7 @@ Latest committed implementation: `691d2b2` (`feat(renderer): add offline vector 
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest verification after MP4 source-audio demux: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, `pnpm format:check`, and `pnpm test:e2e` (16 Chromium tests) all pass. Browser regressions cover unavailable WebGL2 fallback, optimized filter output, MP4 with AAC demuxed from the original video, and silent MP4. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
+Latest verification: `pnpm lint`, `pnpm test` (15 tests), `pnpm build`, and `pnpm format:check` pass. The Chromium run passes 16 tests, including strict B/W preview/export coverage; its remaining source-audio MP4 test cannot download because this installed browser lacks AAC WebCodecs encoding, and the Studio reports that capability limit. Safari is not included in the browser matrix. `.ascii` export continues without audio if the browser cannot capture it and reports the omission; the cumulative cell ceiling has been removed.
 
 ## Works now
 
@@ -15,6 +15,7 @@ Latest verification after MP4 source-audio demux: `pnpm lint`, `pnpm test` (15 t
 - If WebGL2 context creation is unavailable, the bitmap preview falls back to Canvas 2D and reports the active backend; vector preview continues through its existing Canvas 2D path. WebGL2 remains the preferred renderer.
 - Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
+- Added a separate Black & white appearance mode: hard luminance thresholding selects only lightest/densest glyphs, forces white ink on black, and removes antialiased gray pixels from bitmap/vector previews and exports.
 - Edge Detection is live in WebGL2 and configurable with enable, 0–255 threshold, optional Gaussian smoothing, Solo bordi/Bordi + immagine modes, and edge intensity. Sobel magnitudes use a fixed scale; ASCII capture processes at 2× grid resolution to retain thin contours. `.ascii` records filter settings and already-converted pages; PNG and HTML consume those pages unchanged.
 - Flatten Colors uses OKLab nearest-palette assignment without dithering and a bilateral smoother with its own independent strength control. Image palettes are source-based; video palettes come from six evenly spaced frames and remain fixed across playback/export. The WebGL preview and ASCII capture use the same palette; RGB cell colors and `.ascii` metadata preserve it. Combined Edge Detection computes gradients from the original source and uses flattened colors for the image base.
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.

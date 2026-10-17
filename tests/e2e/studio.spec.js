@@ -22,6 +22,116 @@ test('renders a polished empty state and adapts to mobile width', async ({ page 
   }
 });
 
+test('renders true black and white without coloring glyphs', async ({ page }) => {
+  await page.goto('/');
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 96;
+    const context = canvas.getContext('2d');
+    const image = context.createImageData(canvas.width, canvas.height);
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const offset = (y * canvas.width + x) * 4;
+        image.data[offset] = Math.round((x / (canvas.width - 1)) * 255);
+        image.data[offset + 1] = 255 - image.data[offset];
+        image.data[offset + 2] = (y % 2) * 180;
+        image.data[offset + 3] = 255;
+      }
+    }
+    context.putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'color-gradient.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(png, 'base64'),
+  });
+
+  await page.getByRole('button', { name: 'Black and white' }).click();
+  await expect(page.getByLabel('Ink color')).toBeDisabled();
+  await expect(page.getByLabel('Canvas')).toBeDisabled();
+  await expect(page.locator('.color-row code').nth(0)).toHaveText('#FFFFFF');
+  await expect(page.locator('.color-row code').nth(1)).toHaveText('#000000');
+  const bitmap = page.locator('canvas[aria-label="ASCII rendering preview"]');
+  const bitmapColors = await bitmap.evaluate((canvas) => {
+    const gl = canvas.getContext('webgl2');
+    const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+    gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let black = 0;
+    let white = 0;
+    let invalid = false;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const [red, green, blue] = pixels.slice(offset, offset + 3);
+      if (red !== green || green !== blue || (red !== 0 && red !== 255)) invalid = true;
+      if (red === 0) black += 1;
+      else if (red === 255) white += 1;
+    }
+    return { black, white, invalid };
+  });
+  expect(bitmapColors).toMatchObject({ invalid: false });
+  expect(bitmapColors.black).toBeGreaterThan(0);
+  expect(bitmapColors.white).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: 'ASCII text' }).click();
+  const text = await page.getByLabel('Plain text ASCII preview').textContent();
+  expect(new Set(text.replaceAll('\n', '')).size).toBeLessThanOrEqual(2);
+  await page.getByRole('button', { name: 'GPU', exact: true }).click();
+  await page.getByLabel('Rendering vettoriale').check();
+  const vector = page.locator('canvas[aria-label="ASCII vector rendering preview"]');
+  const vectorColors = await vector.evaluate((canvas) => {
+    const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    for (let offset = 0; offset < data.length; offset += 4) {
+      if (
+        data[offset] !== data[offset + 1] ||
+        data[offset + 1] !== data[offset + 2] ||
+        (data[offset] !== 0 && data[offset] !== 255)
+      )
+        return false;
+    }
+    return true;
+  });
+  expect(vectorColors).toBe(true);
+
+  const pngDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export PNG' }).click();
+  const pngBytes = await readFile(await (await pngDownload).path());
+  const pngIsBinary = await page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let offset = 0; offset < data.length; offset += 4) {
+      if (
+        data[offset] !== data[offset + 1] ||
+        data[offset + 1] !== data[offset + 2] ||
+        (data[offset] !== 0 && data[offset] !== 255)
+      )
+        return false;
+    }
+    return true;
+  }, pngBytes.toString('base64'));
+  expect(pngIsBinary).toBe(true);
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const document = JSON.parse(strFromU8(gunzipSync(await readFile(await (await download).path()))));
+  expect(document.render.colors).toEqual({
+    mode: 'bw',
+    foreground: '#ffffff',
+    background: '#000000',
+  });
+  expect(document.frames[0]).not.toHaveProperty('colors');
+  expect(new Set(document.frames[0].text.replaceAll('\n', '')).size).toBeLessThanOrEqual(2);
+});
+
 test('saves parameter defaults for reset and future sessions', async ({ page }) => {
   await page.goto('/');
   await page.locator('#columns').fill('144');

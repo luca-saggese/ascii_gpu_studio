@@ -59,7 +59,7 @@ export function validateScene(scene) {
     throw new Error('Il contrasto deve essere compreso tra 0,2 e 3.');
   if (!Number.isFinite(gamma) || gamma < 0.05 || gamma > 5)
     throw new Error('Il gamma deve essere compreso tra 0,05 e 5.');
-  if (!['mono', 'rgb'].includes(scene.appearance.mode))
+  if (!['mono', 'rgb', 'bw'].includes(scene.appearance.mode))
     throw new Error('Modalità colore non supportata.');
   if (!['contain', 'cover', 'stretch'].includes(scene.appearance.fit))
     throw new Error('Modalità di adattamento non supportata.');
@@ -107,6 +107,11 @@ export function validateScene(scene) {
   }
 
   return true;
+}
+
+export function getAppearanceColors(appearance) {
+  if (appearance.mode === 'bw') return { foreground: '#ffffff', background: '#000000' };
+  return { foreground: appearance.foreground, background: appearance.background };
 }
 
 export function fontFamilyFor(fontFamily) {

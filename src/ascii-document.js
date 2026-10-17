@@ -165,9 +165,12 @@ function validateAsciiDocument(document) {
             glyph.advanceWidth < 0,
         ))) ||
     !colors ||
-    !['mono', 'rgb'].includes(colors.mode) ||
+    !['mono', 'rgb', 'bw'].includes(colors.mode) ||
     !/^#[\da-f]{6}$/i.test(colors.foreground) ||
     !/^#[\da-f]{6}$/i.test(colors.background) ||
+    (colors.mode === 'bw' &&
+      (colors.foreground.toLowerCase() !== '#ffffff' ||
+        colors.background.toLowerCase() !== '#000000')) ||
     invalidFrame
   ) {
     throw new Error('Dimensioni o pagine del documento ASCII non valide.');
