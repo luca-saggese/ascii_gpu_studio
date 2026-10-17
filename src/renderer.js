@@ -118,7 +118,8 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
   let textCanvas = null;
   const tile = { width: 1, height: 1 };
   let atlasScale = 1;
-  const targetAtlasScale = Math.min((window.devicePixelRatio || 1) * 2, 4);
+  const fontSize = 20;
+  const targetAtlasScale = Math.min((window.devicePixelRatio || 1) * 4, 8);
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
   const color = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const setUniforms = (name, ...values) =>
@@ -131,24 +132,20 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const chars = coverageOrder(
       currentScene.typography.charset,
       currentScene.typography.fontFamily,
-      currentScene.typography.fontSize,
+      fontSize,
       currentScene.typography.fontWeight,
     );
-    const font = `${currentScene.typography.fontWeight} ${currentScene.typography.fontSize}px ${currentScene.typography.fontFamily}`;
+    const font = `${currentScene.typography.fontWeight} ${fontSize}px ${currentScene.typography.fontFamily}`;
     const measurementCanvas = document.createElement('canvas');
     const measurementContext = measurementCanvas.getContext('2d');
     measurementContext.font = font;
     const metrics = chars.map((char) => measurementContext.measureText(char));
     const maxAdvance = Math.max(...metrics.map((metric) => metric.width));
     const ascent = Math.max(
-      ...metrics.map(
-        (metric) => metric.actualBoundingBoxAscent || currentScene.typography.fontSize * 0.8,
-      ),
+      ...metrics.map((metric) => metric.actualBoundingBoxAscent || fontSize * 0.8),
     );
     const descent = Math.max(
-      ...metrics.map(
-        (metric) => metric.actualBoundingBoxDescent || currentScene.typography.fontSize * 0.2,
-      ),
+      ...metrics.map((metric) => metric.actualBoundingBoxDescent || fontSize * 0.2),
     );
     tile.width = Math.max(2, Math.ceil(maxAdvance) + 2);
     tile.height = Math.max(2, Math.ceil(ascent + descent) + 2);
@@ -340,7 +337,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       cellWidth: tile.width,
       cellHeight: tile.height,
       atlasScale,
-      fontSize: currentScene.typography.fontSize,
+      fontSize,
     };
   }
 

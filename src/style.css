@@ -682,11 +682,7 @@ input[type='range'] {
   color: #d5f5e9;
   background: #101715;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: min(
-    var(--requested-font),
-    calc(90cqw / var(--columns) / 0.62),
-    calc(90cqh / var(--rows) / 1.2)
-  );
+  font-size: min(calc(90cqw / var(--columns) / 0.62), calc(90cqh / var(--rows) / 1.2));
   line-height: 1.2;
   letter-spacing: 0;
   white-space: pre;

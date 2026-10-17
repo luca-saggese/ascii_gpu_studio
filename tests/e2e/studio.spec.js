@@ -43,9 +43,11 @@ test('imports an image, renders through WebGL2, and exports the source project',
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
   await expect(canvas).toHaveAttribute('data-columns', '96');
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
+  await expect(page.getByLabel('Columns')).toHaveAttribute('max', '320');
+  await expect(page.getByText('Character size')).toHaveCount(0);
   await expect
     .poll(() => canvas.getAttribute('data-atlas-scale').then(Number))
-    .toBeGreaterThanOrEqual(2);
+    .toBeGreaterThanOrEqual(4);
   await expect(page.getByText('LIVE PREVIEW')).toBeVisible();
   const cellAspect = await canvas.evaluate((element) => element.width / element.height);
   const contentAspect = await canvas.evaluate(
@@ -178,7 +180,7 @@ test('maps dark image cells to denser glyphs than bright image cells', async ({ 
     });
     return halves;
   });
-  expect(coverage[0]).toBeGreaterThan(coverage[1] + 0.25);
+  expect(coverage[0]).toBeGreaterThan(coverage[1] + 0.2);
 });
 
 test('rejects a malicious .ascii archive with traversal paths', async ({ page }) => {

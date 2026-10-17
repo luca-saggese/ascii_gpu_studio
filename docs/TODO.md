@@ -13,6 +13,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-031 [P0] Export PNG from WebGL canvas — M5; browser validates PNG signature and nonzero dimensions; `9c9633c`.
 - [x] AGPU-032 [P0] Vue `AsciiPlayer` wrapper and runnable example — M5; browser loads a generated `.ascii` and renders it; `9c9633c`.
 - [x] AGPU-040 [P0] Reject ZIP traversal and drive-absolute paths during bounded streaming extraction — unit/E2E cover path rejection; `06410a5`.
+- [x] AGPU-014 [P1] Remove user font-size control and improve raster detail — fixed internal 20 px glyph size, 4×–8× GPU-aware atlas scale, and 32–320 column control; covered by Chromium E2E.
 
 ## In progress
 

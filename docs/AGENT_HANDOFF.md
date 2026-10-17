@@ -4,7 +4,7 @@
 
 Vue 3/Vite local-first Studio with a raw WebGL2 ASCII renderer. The Studio imports local raster images and browser-supported video; `HTMLVideoElement` supplies both video clock and original audio. `.ascii` projects are versioned ZIP files, extracted with streaming size/path/count checks. `packages/vue` contains the in-repository Vue player and a runnable Vite example.
 
-Latest verified implementation commit: `5c9363a`; the current uncommitted renderer change increases glyph-atlas rasterization to 2× device-pixel ratio up to 4×, respecting GPU texture limits. Earlier verified behavior includes plain-text ASCII preview, aspect-correct framebuffer sizing, and dark-to-dense glyph mapping. Re-run the full check set after the atlas resolution change.
+Latest verified commit: `58325f3`; current working tree removes the font-size slider, fixes internal glyph font size at 20 px, increases atlas raster scale to 4× device-pixel ratio up to 8× subject to GPU texture limits, and expands the Studio columns control to 320. Verified: lint, 5 unit tests, production build, format check, and all 6 Chromium E2E scenarios.
 
 ## First files to read
 
@@ -38,4 +38,4 @@ No WebGL context restoration/fallback, audio acoustic assertion, other-browser E
 
 ## Resume
 
-The latest renderer and text-preview changes have passed the full local check set. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.
+The latest UI/renderer changes have passed the full local check set. Do not describe M6 as complete until the outstanding security, cross-browser, accessibility, and release checks are evidenced.

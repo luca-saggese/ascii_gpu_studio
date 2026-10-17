@@ -398,21 +398,10 @@ onBeforeUnmount(() => {
             v-model.number="scene.grid.columns"
             type="range"
             min="32"
-            max="180"
+            max="320"
             step="1"
           />
-          <div class="range-ends"><span>32</span><span>180</span></div>
-          <label class="field-label" for="fontsize"
-            >Character size <output>{{ scene.typography.fontSize }} px</output></label
-          >
-          <input
-            id="fontsize"
-            v-model.number="scene.typography.fontSize"
-            type="range"
-            min="8"
-            max="28"
-            step="1"
-          />
+          <div class="range-ends"><span>32</span><span>320</span></div>
         </section>
         <section class="inspector-section">
           <div class="section-title">
@@ -527,7 +516,6 @@ onBeforeUnmount(() => {
             :style="{
               '--columns': statsLabel.columns,
               '--rows': statsLabel.rows,
-              '--requested-font': `${scene.typography.fontSize}px`,
             }"
           >
             <pre aria-label="Plain text ASCII preview">{{ asciiText }}</pre>

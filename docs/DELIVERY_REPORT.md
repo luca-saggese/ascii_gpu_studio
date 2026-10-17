@@ -15,7 +15,7 @@
 - Vue 3/Vite Studio in JavaScript ESM, Node 24.20.0 / pnpm 11.24.0; no TypeScript.
 - Responsive dark Studio with local image/video selection, drag-and-drop, loading/error states, fitted canvas and mobile controls view.
 - Real WebGL2 glyph-atlas renderer; live columns, built-in charset, font family/size, monochrome/source color, fit, foreground/background, contrast, brightness and invert. Cell advance and height use measured font metrics; the shader selects a discrete glyph and samples the full glyph tile. Cell count is capped at 40,000, with no per-frame GPU readback.
-- Glyph atlas rasterization uses 2× device-pixel ratio up to 4×, bounded by the GPU maximum texture size; framebuffer dimensions keep the measured glyph-cell aspect ratio and are shown as GPU pixel dimensions in the status bar.
+- Glyph atlas uses a fixed 20 px internal font size and rasterizes at 4× device-pixel ratio up to 8×, bounded by the GPU maximum texture size. Font size is not user-adjustable; the Studio provides 32–320 grid columns for resolution control. Framebuffer dimensions keep the measured glyph-cell aspect ratio and are shown as GPU pixel dimensions in the status bar.
 - Added a toggle between WebGL preview and a normal selectable/copyable plain-text ASCII grid, generated from the same source frame and scene adjustments. Video text previews refresh at up to 8 fps to limit CPU work.
 - Corrected luminance-to-glyph mapping: dark image cells now select denser glyphs and bright cells lighter glyphs. A dedicated half-black/half-white browser regression verifies the output.
 - A browser regression check confirms glyphs have horizontal mask variation and multiple distinct cell masks; this guards against sampling a single atlas column or blending adjacent characters.
@@ -32,7 +32,7 @@
 | ------------------- | --------------------------------------------------------------- |
 | `pnpm lint`         | PASS, no warnings                                               |
 | `pnpm test`         | PASS, 5 unit tests                                              |
-| `pnpm build`        | PASS; 116.47 kB JS (45.27 kB gzip), 13.19 kB CSS (3.82 kB gzip) |
+| `pnpm build`        | PASS; 116.15 kB JS (45.25 kB gzip), 13.16 kB CSS (3.81 kB gzip) |
 | `pnpm format:check` | PASS                                                            |
 | `pnpm test:e2e`     | PASS, 6 Chromium scenarios                                      |
 

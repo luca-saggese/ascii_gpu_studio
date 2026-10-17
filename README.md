@@ -21,8 +21,8 @@ ASCII GPU Studio è un'applicazione web per esplorare e rifinire conversioni ASC
 ## Funzionalità
 
 - **Immagini e video locali** — apri un file o trascinalo nello Studio. I video vengono riprodotti con l'audio originale del browser, sincronizzato con i fotogrammi.
-- **Rendering WebGL2** — atlante dei glifi rasterizzato ad alta risoluzione (fino a 4×, nei limiti della GPU), selezione della densità e proporzioni delle celle basate sulle metriche del font.
-- **Controlli di resa** — regola charset, colonne, dimensione e famiglia del font, modalità colore, contrasto, luminosità, inversione e adattamento dell'immagine.
+- **Rendering WebGL2** — atlante dei glifi rasterizzato ad alta risoluzione (4×–8×, nei limiti della GPU), selezione della densità e proporzioni delle celle basate sulle metriche del font.
+- **Controlli di resa** — regola charset, griglia da 32 a 320 colonne, famiglia del font, modalità colore, contrasto, luminosità, inversione e adattamento dell'immagine. La dimensione dei caratteri è gestita automaticamente.
 - **Anteprima ASCII testuale** — passa dalla preview GPU al testo monospace normale, pronto da selezionare e copiare.
 - **Esportazione** — salva un progetto `.ascii` con sorgente, impostazioni e miniatura oppure esporta la preview in PNG.
 - **Player Vue riutilizzabile** — nel repository trovi il componente e un esempio funzionante.

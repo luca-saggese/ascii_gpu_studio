@@ -6,13 +6,13 @@ Latest verified implementation commit: `e835d84` (`fix(renderer): sample complet
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (116.47 kB JS, 13.19 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (6 Chromium scenarios, including dark-to-dense glyph mapping, distinct glyph masks, and source audio decode).
+Latest working-tree checks: `pnpm lint` PASS; `pnpm test` PASS (5 tests); `pnpm build` PASS (116.15 kB JS, 13.16 kB CSS); `pnpm format:check` PASS; `pnpm test:e2e` PASS (6 Chromium scenarios, including fixed font control, 320-column limit, high-resolution atlas, dark-to-dense glyph mapping, distinct glyph masks, and source audio decode).
 
 ## Works now
 
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
-- Real WebGL2 fragment shader with measured glyph atlas, live columns/font/charset/color/fit/brightness/contrast/invert controls, and PNG capture.
-- Toggle between WebGL output and normal monospace ASCII text; glyph atlas rasterization uses 2× device-pixel ratio up to 4×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
+- Real WebGL2 fragment shader with measured glyph atlas, adjustable columns/charset/color/fit/brightness/contrast/invert controls, and PNG capture. Font size is fixed internally rather than exposed as a separate setting.
+- Toggle between WebGL output and normal monospace ASCII text; Studio grid supports 32–320 columns. Glyph atlas rasterization uses 4× device-pixel ratio up to 8×, bounded by the GPU texture limit. Framebuffer preserves cell aspect ratio and reports actual WebGL pixel dimensions.
 - Corrected tonal mapping so dark pixels select denser glyphs and bright pixels select lighter glyphs; a black/white split-image browser regression verifies the behavior.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
 - `.ascii` v1 ZIP export/import containing manifest, original source, preview PNG, and settings; streaming path/entry/expanded-size checks.
