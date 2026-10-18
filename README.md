@@ -11,7 +11,10 @@ A local-first creative studio for making, previewing, exporting, and playing ASC
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/studio-showcase.png" alt="ASCII GPU Studio converting an image to ASCII art with typography and rendering controls" width="100%">
+  <video controls autoplay muted loop playsinline width="100%" poster="docs/screenshots/studio-showcase.png">
+    <source src="https://raw.githubusercontent.com/luca-saggese/ascii_gpu_studio/main/docs/videos/ascii_studio2.mp4" type="video/mp4">
+    Your browser does not support embedded video. <a href="docs/videos/ascii_studio2.mp4">Watch the ASCII GPU Studio demo</a>.
+  </video>
 </p>
 
 ## Meet ASCII GPU Studio
