@@ -12,6 +12,7 @@ Typography and appearance controls now use font size 4–16 (default 8), line he
 
 ## Works now
 
+- The main header includes an accessible GitHub icon linking to the repository in a new tab, visible on desktop and mobile. Lint, 16 unit tests, production build, formatting, and a focused Chromium keyboard/link/layout check (320-1440 px) pass.
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
 - Real WebGL2 fragment shader with measured glyph atlas, adjustable font size, line height, charset/color/brightness/contrast/invert controls, and PNG capture.
 - If WebGL2 context creation is unavailable, the bitmap preview falls back to Canvas 2D and reports the active backend; vector preview continues through its existing Canvas 2D path. WebGL2 remains the preferred renderer.

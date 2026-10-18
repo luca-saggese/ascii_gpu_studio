@@ -3,6 +3,27 @@ import { gunzipSync, strFromU8, strToU8, zipSync } from 'fflate';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
+test('shows an accessible GitHub repository link on desktop and mobile', async ({ page }) => {
+  await page.goto('/');
+  const link = page.getByRole('link', {
+    name: 'ASCII GPU Studio on GitHub (opens in a new tab)',
+  });
+  await expect(link).toHaveAttribute('href', 'https://github.com/luca-saggese/ascii_gpu_studio');
+  await expect(link).toHaveAttribute('target', '_blank');
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(link.locator('svg')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(link).toBeFocused();
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(link).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+  }
+});
+
 test('renders a polished empty state and adapts to mobile width', async ({ page }) => {
   await page.goto('/');
   await expect(

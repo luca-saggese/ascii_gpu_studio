@@ -4,6 +4,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 
 ## Completed
 
+- [x] Add an accessible GitHub repository icon/link to the main header, visible on desktop and mobile; verified with a focused Chromium keyboard/link/layout test.
 - [x] AGPU-001 [P0] Bootstrap Vue/Vite JavaScript project — M0; `9c9633c`.
 - [x] AGPU-010 [P0] Import local images and render glyph atlas with WebGL2 — M1; E2E verifies complete, distinct glyph masks; `9c9633c`, `e835d84`.
 - [x] AGPU-011 [P0] Wire charset, font family/size, columns, fit, color, contrast, brightness, invert — M2 baseline; E2E changes columns; `9c9633c`, `e835d84`.

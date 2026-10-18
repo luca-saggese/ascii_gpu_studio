@@ -40,6 +40,7 @@ button:disabled {
   cursor: not-allowed;
 }
 button:focus-visible,
+a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 summary:focus-visible {
@@ -244,6 +245,12 @@ summary:focus-visible {
 .icon-button:hover {
   background: #212727;
   color: #e9f1ed;
+}
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
 }
 .icon-button.small {
   width: 25px;
@@ -962,7 +969,7 @@ input[type='range'] {
   .top-actions {
     gap: 5px;
   }
-  .top-actions .icon-button,
+  .top-actions .icon-button:not(.github-link),
   .top-divider,
   .top-actions .subtle {
     display: none;
