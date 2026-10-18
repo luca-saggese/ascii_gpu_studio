@@ -5,3 +5,13 @@ playwright-report/
 test-results/
 .DS_Store
 *.local
+
+# Added by CopilotKit CLI: credential files, which must never be committed.
+.env
+.env.*
+!.env.example
+
+# Added by CopilotKit CLI: browser snapshots a coding agent writes.
+.playwright-mcp/
+.copilotkit/project.json
+ASCII_GPU_STUDIO_IMPLEMENTATION_SPEC.md
