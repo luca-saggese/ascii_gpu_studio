@@ -8,6 +8,7 @@ import { deserializeAsciiDocument, serializeAsciiDocument } from './ascii-docume
 import { captureAsciiDocument } from './ascii-export.js';
 import { renderAsciiPage, renderAsciiPng } from './ascii-render.js';
 import { createPlayableHtml } from './templates/playable-template.js';
+import { createPlayablePython } from './templates/python-template.js';
 import { assertDeterministicMp4Support, encodeAsciiMp4 } from './mp4-export.js';
 
 const DEFAULTS_STORAGE_KEY = 'ascii-gpu-studio:scene-defaults:v1';
@@ -580,6 +581,8 @@ async function performExport(kind) {
       download(await renderAsciiPng(model), `${exportBaseName()}.png`);
     } else if (kind === 'html') {
       download(await createPlayableHtml(model), `${exportBaseName()}-playable.html`);
+    } else if (kind === 'python') {
+      download(await createPlayablePython(model), `${exportBaseName()}-playable.py`);
     }
     notify(exportWarning || 'Export completato');
   } catch (err) {
@@ -761,6 +764,9 @@ function onKeydown(event) {
             </button>
             <button role="menuitem" :disabled="busy" @click="performExport('html')">
               Export HTML playable
+            </button>
+            <button role="menuitem" :disabled="busy" @click="performExport('python')">
+              Export Python
             </button>
           </div>
         </div>

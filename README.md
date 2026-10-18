@@ -31,7 +31,7 @@ Video is a first-class format: convert a clip into timestamped ASCII frames, pre
 - **Selectable, copyable ASCII** — switch to plain text, select the output, and copy it wherever you like.
 - **Bitmap or true vector glyphs** — choose fast atlas rendering or OpenType outlines with preserved counters. Vector geometry is reused in preview, PNG, and offline HTML.
 - **Audio-aware playback and export** — ASCII video documents can include captured source audio. The standalone HTML player supports synchronized playback and audio; the terminal player can play embedded audio through FFplay. If browser audio capture is unavailable, ASCII video export still completes without audio and reports the omission.
-- **One-click exports** — save portable gzip-JSON `.ascii` projects, render PNG images, or create a self-contained playable HTML page. Video export to MP4 is offered when the browser provides the required deterministic encoding capabilities.
+- **One-click exports** — save portable gzip-JSON `.ascii` projects, render PNG images, create a self-contained playable HTML page, or download a Python player with frames and audio embedded in a single `.py`. Video export to MP4 is offered when the browser provides the required deterministic encoding capabilities.
 - **Creative image controls** — tune typography, glyph density, brightness, contrast, and inversion; detect edges with Sobel; or flatten colors into a stable perceptual palette without dithering.
 - **Reusable Vue player** — integrate exported ASCII projects with the included Vue component and runnable example.
 - **Private by design** — import, conversion, and export stay on your device.
@@ -59,7 +59,21 @@ python3 tools/play_ascii.py video.ascii --no-audio --no-color
 
 Audio is optional in `.ascii` documents. Silent exports play normally; when audio is present, FFplay handles the track while the terminal player schedules the ASCII frames. Startup and device latency from the external audio player may cause a small initial sync offset.
 
+In an interactive terminal, **Space** pauses/resumes video and **Left/Right arrows** seek backward/forward by **10 seconds**, clamped to the clip bounds. Seeking while paused updates the frame without resuming. **Ctrl+C** exits. These controls also work in exported Python scripts; re-export older scripts to include them. Playback stops audio when paused and restarts FFplay at the matching position on resume/seek, so a small device startup delay may be audible. POSIX terminal input/echo settings are restored on exit; piped/non-interactive input is not read. POSIX keyboard handling is tested with a pseudo-terminal; Windows console keys are supported but not runtime-tested here.
+
 With ANSI colors enabled, the player forces a black background for the full frame, including centered margins, regardless of the terminal theme or recorded background. Glyph colors are preserved. Default terminal colors are restored after rendering and on exit/Ctrl+C; the terminal theme is not changed. `--no-color` (or redirected output) does not force a background. This requires an ANSI-compatible terminal that honors background colors when clearing the screen.
+
+### Export a standalone Python player
+
+Choose **Export → Export Python** to download `<name>-playable.py`. It includes the same terminal player plus the gzip-compressed ASCII document, including its audio when present. No separate `.ascii`, media file, network connection, or Python package is needed.
+
+```sh
+python3 my-video-playable.py
+python3 my-video-playable.py --fps 24
+python3 my-video-playable.py --no-audio --no-color
+```
+
+Python 3 is required. Audio still requires **FFplay/FFmpeg installed locally**; the executable is not embedded. If unavailable, the script reports it explicitly; `--no-audio` plays silently. Use `--ffplay /path/to/ffplay` to select the executable. Audio is written to a temporary local file for FFplay and removed when playback ends or is interrupted. The browser cannot set executable permissions on downloads; run with `python3` (or use `chmod +x` yourself). Terminal glyphs use the terminal font, not the Studio's vector outlines. Existing player limits apply: 110 MiB compressed / 250 MiB decompressed payload and 100,000 cells per frame; Base64 increases the script size.
 
 ## Portable `.ascii` projects and HTML playback
 

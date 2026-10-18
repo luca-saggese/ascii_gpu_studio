@@ -3,6 +3,7 @@ import { gunzipSync, strFromU8, strToU8, zipSync } from 'fflate';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
+import { spawnSync } from 'node:child_process';
 
 async function audioPlaybackTime(page, audio) {
   return page.evaluate(async (audio) => {
@@ -276,6 +277,98 @@ for (const fallback of [false, true]) {
     await expect(background).toHaveValue('#204060');
   });
 }
+
+test('exports a standalone Python player with embedded frames and original audio', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles('tests/fixtures/motion-with-audio.webm');
+  await expect(page.getByLabel('ASCII rendering preview', { exact: true })).toHaveAttribute(
+    'data-columns',
+    /[1-9]\d*/,
+  );
+  const asciiDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII', exact: true }).click();
+  const model = JSON.parse(
+    strFromU8(gunzipSync(await readFile(await (await asciiDownload).path()))),
+  );
+  expect(model.audio.dataBase64).toBeTruthy();
+  await page.getByRole('button', { name: /Export/ }).click();
+  const option = page.getByRole('menuitem', { name: 'Export Python', exact: true });
+  await option.focus();
+  const download = page.waitForEvent('download');
+  await page.keyboard.press('Enter');
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('motion-with-audio-playable.py');
+  const script = await readFile(await file.path(), 'utf8');
+  const encoded = script.match(/EMBEDDED_ASCII = \(\n([\s\S]*?)\n\)/)[1].replace(/[\s"]/g, '');
+  const embedded = JSON.parse(strFromU8(gunzipSync(Buffer.from(encoded, 'base64'))));
+  expect(embedded.audio).toEqual(model.audio);
+  expect(embedded.render).toEqual(model.render);
+  expect(embedded.frames.map(({ timestampMs, durationMs }) => [timestampMs, durationMs])).toEqual(
+    model.frames.map(({ timestampMs, durationMs }) => [timestampMs, durationMs]),
+  );
+  expect(embedded.frames.some((frame) => /\S/.test(frame.text))).toBe(true);
+  const scriptPath = testInfo.outputPath(file.suggestedFilename());
+  await writeFile(scriptPath, script);
+  const result = spawnSync('python3', [scriptPath, '--no-audio', '--fps', '24'], {
+    encoding: 'utf8',
+    timeout: 10000,
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toContain('\x1b[2J\x1b[H');
+  expect(result.stdout.endsWith('\x1b[0m\x1b[?25h\n')).toBe(true);
+  const audioCheck = spawnSync(
+    'python3',
+    [
+      '-c',
+      `import base64, os, runpy, sys
+from unittest.mock import patch
+script, expected = sys.argv[1:]
+sys.argv = [script]
+paths = []
+def start(command, **kwargs):
+    path = command[-1]
+    paths.append(path)
+    with open(path, "rb") as audio:
+        assert audio.read() == base64.b64decode(expected)
+    from unittest.mock import Mock
+    process = Mock()
+    process.poll.return_value = 0
+    return process
+with patch("shutil.which", return_value="/mock/ffplay"), patch("subprocess.Popen", side_effect=start):
+    try:
+        runpy.run_path(script, run_name="__main__")
+    except SystemExit as result:
+        assert result.code == 0
+assert len(paths) == 1 and not os.path.exists(paths[0])
+`,
+      scriptPath,
+      model.audio.dataBase64,
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 10000,
+      maxBuffer: 10 * 1024 * 1024,
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+    },
+  );
+  expect(audioCheck.error).toBeUndefined();
+  expect(audioCheck.status, audioCheck.stderr).toBe(0);
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'embedded-roundtrip.ascii',
+    mimeType: 'application/gzip',
+    buffer: Buffer.from(encoded, 'base64'),
+  });
+  const importedDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export Python', exact: true }).click();
+  expect(await readFile(await (await importedDownload).path(), 'utf8')).toBe(script);
+});
 
 test('renders true black and white without coloring glyphs', async ({ page }) => {
   await page.goto('/');

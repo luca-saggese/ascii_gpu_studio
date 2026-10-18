@@ -4,7 +4,9 @@
 import argparse
 import base64
 import bisect
+from contextlib import ExitStack
 import gzip
+import io
 import json
 import math
 import os
@@ -21,16 +23,85 @@ MAX_EXPANDED_BYTES = 250 * 1024 * 1024
 ANSI_RESET = "\033[0m"
 
 
+class TerminalKeyboard:
+    def __init__(self):
+        self.fd = None
+        self.attributes = None
+        self.pending = ""
+        self.windows = False
+
+    def __enter__(self):
+        if not sys.stdin.isatty():
+            return self
+        if os.name == "nt":
+            self.windows = True
+            return self
+        import termios
+
+        self.fd = sys.stdin.fileno()
+        self.attributes = termios.tcgetattr(self.fd)
+        settings = termios.tcgetattr(self.fd)
+        settings[3] &= ~(termios.ICANON | termios.ECHO)
+        settings[6][termios.VMIN] = 0
+        settings[6][termios.VTIME] = 0
+        termios.tcsetattr(self.fd, termios.TCSANOW, settings)
+        return self
+
+    def __exit__(self, *_):
+        if self.attributes is not None:
+            import termios
+
+            termios.tcsetattr(self.fd, termios.TCSANOW, self.attributes)
+
+    def read(self):
+        if self.windows:
+            import msvcrt
+
+            while msvcrt.kbhit():
+                self.pending += msvcrt.getwch()
+        elif self.fd is not None:
+            import select
+
+            if select.select([self.fd], [], [], 0)[0]:
+                self.pending += os.read(self.fd, 64).decode("ascii", errors="ignore")
+        commands = []
+        sequences = {
+            " ": "pause",
+            "\033[C": "forward",
+            "\033[D": "backward",
+            "\033OC": "forward",
+            "\033OD": "backward",
+            "\xe0M": "forward",
+            "\xe0K": "backward",
+            "\x00M": "forward",
+            "\x00K": "backward",
+        }
+        while self.pending:
+            for sequence, command in sequences.items():
+                if self.pending.startswith(sequence):
+                    commands.append(command)
+                    self.pending = self.pending[len(sequence):]
+                    break
+            else:
+                if any(sequence.startswith(self.pending) for sequence in sequences):
+                    break
+                self.pending = self.pending[1:]
+        return commands
+
+
 def load_document(path):
-    compressed = os.path.getsize(path)
+    with open(path, "rb") as source:
+        return load_document_stream(source, os.fstat(source.fileno()).st_size)
+
+
+def load_document_stream(source, compressed):
     if compressed > MAX_COMPRESSED_BYTES:
         raise ValueError("Il file .ascii supera il limite compresso di 110 MiB.")
-    with open(path, "rb") as source:
-        if source.read(2) != b"\x1f\x8b":
-            raise ValueError("Il file non è un documento .ascii gzip valido.")
-        source.seek(0)
-        with gzip.GzipFile(fileobj=source) as stream:
-            payload = stream.read(MAX_EXPANDED_BYTES + 1)
+    if source.read(2) != b"\x1f\x8b":
+        raise ValueError("Il file non è un documento .ascii gzip valido.")
+    source.seek(0)
+    with gzip.GzipFile(fileobj=source) as stream:
+        payload = stream.read(MAX_EXPANDED_BYTES + 1)
     if len(payload) > MAX_EXPANDED_BYTES:
         raise ValueError("Il documento .ascii supera il limite decompresso di 250 MiB.")
     document = json.loads(payload.decode("utf-8"))
@@ -231,7 +302,7 @@ def terminal_size():
         return size.columns, size.lines
 
 
-def start_audio(audio, executable, temporary_path):
+def start_audio(audio, executable, temporary_path, position=0):
     if audio is None:
         return None
     if executable is None:
@@ -241,7 +312,7 @@ def start_audio(audio, executable, temporary_path):
         )
     with open(temporary_path, "wb") as target:
         target.write(audio["_decoded"])
-    offset = audio["offsetMs"] / 1000
+    offset = audio["offsetMs"] / 1000 - position
     command = [
         executable,
         "-nodisp",
@@ -260,6 +331,16 @@ def start_audio(audio, executable, temporary_path):
     )
 
 
+def stop_audio(process):
+    if process is not None and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
 def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
     frames = document["frames"]
     timestamps = [frame["timestampMs"] / 1000 for frame in frames]
@@ -267,7 +348,7 @@ def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
         timestamps[-1] + frames[-1]["durationMs"] / 1000,
         0,
     )
-    if len(frames) == 1:
+    if document["contentType"] == "image":
         width, height = terminal_size()
         sys.stdout.write(render_frame(document, 0, width, height, color))
         sys.stdout.flush()
@@ -283,7 +364,9 @@ def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
 
     audio_file = None
     audio_process = None
+    resources = ExitStack()
     try:
+        keyboard = resources.enter_context(TerminalKeyboard())
         if audio:
             handle = tempfile.NamedTemporaryFile(suffix=".audio", delete=False)
             audio_file = handle.name
@@ -292,13 +375,34 @@ def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
 
         # Absolute timestamps and dropped late frames prevent accumulated drift.
         clock_start = time.monotonic()
+        position = 0
+        paused = False
         next_frame = 0
         last_drawn = -1
         next_allowed_draw = clock_start
         while True:
             now = time.monotonic()
-            elapsed = now - clock_start
-            if elapsed >= end_time:
+            elapsed = position if paused else position + now - clock_start
+            commands = keyboard.read()
+            if commands:
+                elapsed = min(end_time, elapsed)
+                for command in commands:
+                    if command == "pause":
+                        paused = not paused
+                    elif command == "forward":
+                        elapsed = min(end_time, elapsed + 10)
+                    elif command == "backward":
+                        elapsed = max(0, elapsed - 10)
+                stop_audio(audio_process)
+                audio_process = None
+                if audio and not paused and elapsed < end_time:
+                    audio_process = start_audio(audio, player, audio_file, position=elapsed)
+                position = elapsed
+                clock_start = time.monotonic()
+                now = clock_start
+                last_drawn = -1
+                next_allowed_draw = now
+            if elapsed >= end_time and not paused:
                 break
             frame_index = max(0, bisect.bisect_right(timestamps, elapsed) - 1)
             if frame_index != last_drawn and now >= next_allowed_draw:
@@ -308,6 +412,9 @@ def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
                 last_drawn = frame_index
                 next_frame = frame_index + 1
                 next_allowed_draw = now + (1 / fps if fps else 0)
+            if paused:
+                time.sleep(0.02)
+                continue
             next_time = timestamps[next_frame] if next_frame < len(timestamps) else end_time
             wait = max(0, min(next_time - elapsed, next_allowed_draw - now))
             if wait <= 0:
@@ -315,22 +422,23 @@ def play(document, fps=None, color=True, audio_enabled=True, ffplay="ffplay"):
             else:
                 time.sleep(min(wait, 0.05))
     finally:
-        if audio_process is not None and audio_process.poll() is None:
-            audio_process.terminate()
-            try:
-                audio_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                audio_process.kill()
-                audio_process.wait()
-        if audio_file and os.path.exists(audio_file):
-            os.unlink(audio_file)
-        sys.stdout.write(ANSI_RESET + "\033[?25h\n")
-        sys.stdout.flush()
+        try:
+            stop_audio(audio_process)
+            if audio_file and os.path.exists(audio_file):
+                os.unlink(audio_file)
+        finally:
+            resources.close()
+            sys.stdout.write(ANSI_RESET + "\033[?25h\n")
+            sys.stdout.flush()
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("file", help="file .ascii gzip JSON da riprodurre")
+def parse_args(argv=None, embedded=False):
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog="Controlli video: Spazio pausa/riprendi, freccia destra +10 s, sinistra -10 s, Ctrl+C esci.",
+    )
+    if not embedded:
+        parser.add_argument("file", help="file .ascii gzip JSON da riprodurre")
     parser.add_argument(
         "--fps",
         type=float,
@@ -347,10 +455,17 @@ def parse_args(argv=None):
     return options
 
 
-def main(argv=None):
-    options = parse_args(argv)
+def main(argv=None, embedded_base64=None):
+    options = parse_args(argv, embedded=embedded_base64 is not None)
     try:
-        document = load_document(options.file)
+        if embedded_base64 is None:
+            document = load_document(options.file)
+        else:
+            if len(embedded_base64) > 4 * ((MAX_COMPRESSED_BYTES + 2) // 3):
+                raise ValueError("Il file .ascii supera il limite compresso di 110 MiB.")
+            compressed = base64.b64decode(embedded_base64, validate=True)
+            with io.BytesIO(compressed) as source:
+                document = load_document_stream(source, len(compressed))
         if document["contentType"] == "image":
             width, height = terminal_size()
             sys.stdout.write(
@@ -386,4 +501,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(embedded_base64=globals().get("EMBEDDED_ASCII")))
