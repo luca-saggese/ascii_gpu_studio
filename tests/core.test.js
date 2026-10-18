@@ -7,8 +7,12 @@ import {
 } from '../src/core.js';
 
 describe('scene and grid', () => {
-  it('uses neutral grayscale defaults without losing custom source-color settings', () => {
+  it('keeps both selected color endpoints for monochrome and fixes only binary B/W', () => {
     expect(getAppearanceColors(DEFAULT_SCENE.appearance)).toEqual({
+      foreground: DEFAULT_SCENE.appearance.foreground,
+      background: DEFAULT_SCENE.appearance.background,
+    });
+    expect(getAppearanceColors({ ...DEFAULT_SCENE.appearance, mode: 'bw' })).toEqual({
       foreground: '#ffffff',
       background: '#000000',
     });

@@ -105,7 +105,9 @@ for (const fallback of [false, true]) {
       buffer: Buffer.from(png, 'base64'),
     });
     await page.getByRole('button', { name: 'Monochrome', exact: true }).click();
-    await expect(page.getByLabel('Ink color')).toBeDisabled();
+    await expect(page.getByLabel('Ink color')).toBeEnabled();
+    await page.getByLabel('Ink color').fill('#ffffff');
+    await page.getByLabel('Canvas', { exact: true }).fill('#000000');
     const bitmap = page.getByLabel('ASCII rendering preview', { exact: true });
     const pixels = await bitmap.evaluate((canvas, fallback) => {
       let data;
@@ -195,6 +197,83 @@ for (const fallback of [false, true]) {
     });
     await expect(textPreview).toHaveText(model.frames[0].text);
     expect(await textPreview.locator('span').count()).toBeGreaterThan(3);
+  });
+
+  test(`interpolates monochrome glyph inks between both selected colors in ${fallback ? 'Canvas fallback' : 'WebGL'}`, async ({
+    page,
+  }) => {
+    if (fallback)
+      await page.addInitScript(() => {
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
+          return kind === 'webgl2' ? null : getContext.call(this, kind, ...args);
+        };
+      });
+    await page.goto('/');
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 250;
+      canvas.height = 100;
+      const context = canvas.getContext('2d');
+      for (const [index, gray] of [0, 64, 128, 192, 255].entries()) {
+        context.fillStyle = `rgb(${gray} ${gray} ${gray})`;
+        context.fillRect(index * 50, 0, 50, 100);
+      }
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'five-tones.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(png, 'base64'),
+    });
+    const ink = page.getByLabel('Ink color');
+    const background = page.getByLabel('Canvas', { exact: true });
+    await expect(ink).toBeEnabled();
+    await expect(background).toBeEnabled();
+    await ink.fill('#e0c0a0');
+    await background.fill('#204060');
+    await page.locator('#contrast').fill('1');
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/ }).click();
+    await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+    const model = JSON.parse(strFromU8(gunzipSync(await readFile(await (await download).path()))));
+    expect(model.render.colors).toEqual({
+      mode: 'mono',
+      foreground: '#e0c0a0',
+      background: '#204060',
+    });
+    const colors = Buffer.from(model.frames[0].colors, 'base64');
+    const tones = [];
+    for (const [index, gray] of [0, 64, 128, 192, 255].entries()) {
+      const x = Math.floor(((index + 0.5) / 5) * model.render.columns);
+      const y = Math.floor(model.render.rows / 2);
+      const offset = (y * model.render.columns + x) * 3;
+      const tone = [...colors.subarray(offset, offset + 3)];
+      const expected = [32, 64, 96].map((base, channel) =>
+        Math.round(base + ([224, 192, 160][channel] - base) * (gray / 255)),
+      );
+      for (let channel = 0; channel < 3; channel += 1)
+        expect(Math.abs(tone[channel] - expected[channel])).toBeLessThanOrEqual(1);
+      tones.push(tone.join(','));
+    }
+    expect(new Set(tones).size).toBe(5);
+    await page.getByRole('button', { name: 'ASCII text' }).click();
+    const textColors = await page
+      .getByLabel('Plain text ASCII preview')
+      .locator('span')
+      .evaluateAll((spans) => spans.map((span) => getComputedStyle(span).color));
+    for (const tone of tones) expect(textColors).toContain(`rgb(${tone.split(',').join(', ')})`);
+    await page.getByRole('button', { name: 'GPU', exact: true }).click();
+    const bitmap = page.getByLabel('ASCII rendering preview', { exact: true });
+    const before = await bitmap.evaluate((canvas) => canvas.toDataURL());
+    await ink.fill('#8090a0');
+    await expect.poll(() => bitmap.evaluate((canvas) => canvas.toDataURL())).not.toBe(before);
+    await page.getByRole('button', { name: 'Black and white' }).click();
+    await expect(ink).toBeDisabled();
+    await expect(background).toBeDisabled();
+    await page.getByRole('button', { name: 'Monochrome', exact: true }).click();
+    await expect(ink).toHaveValue('#8090a0');
+    await expect(background).toHaveValue('#204060');
   });
 }
 

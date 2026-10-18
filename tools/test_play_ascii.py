@@ -1,11 +1,12 @@
 import base64
 import gzip
+import io
 import json
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from play_ascii import crop_center, load_document, render_frame, start_audio
+from play_ascii import crop_center, load_document, main, render_frame, start_audio
 
 
 def sample_document():
@@ -82,6 +83,33 @@ class TerminalAsciiPlayerTests(unittest.TestCase):
         output = render_frame(document, 0, 8, 4, color=True)
         self.assertIn("\033[38;2;32;32;32mA", output)
         self.assertIn("\033[38;2;107;107;107mD", output)
+
+    def test_keeps_black_background_across_rows_and_centering_on_light_terminals(self):
+        document = sample_document()
+        document["render"]["colors"]["background"] = "#ffffff"
+        output = render_frame(document, 0, 8, 4, color=True)
+        self.assertTrue(output.startswith("\033[0m\033[40m\033[2J\033[H"))
+        self.assertEqual(output.count("\033[0m"), 2)
+        self.assertTrue(output.endswith("\033[0m"))
+        self.assertNotIn("\033[0m\n", output)
+        self.assertNotIn("\033[48;2;255;255;255m", output)
+        self.assertIn("\n  \033[38;2;255;255;255mE", output)
+
+    def test_no_color_does_not_force_terminal_background(self):
+        output = render_frame(sample_document(), 0, 8, 4, color=False)
+        self.assertNotIn("\033[40m", output)
+        self.assertNotIn("\033[38;", output)
+        self.assertNotIn("\033[48;", output)
+
+    def test_interrupted_playback_restores_default_colors_and_cursor(self):
+        output = io.StringIO()
+        with (
+            patch("play_ascii.load_document", return_value=sample_document()),
+            patch("play_ascii.play", side_effect=KeyboardInterrupt),
+            patch("play_ascii.sys.stdout", output),
+        ):
+            self.assertEqual(main(["example.ascii", "--no-audio"]), 0)
+        self.assertTrue(output.getvalue().endswith("\033[0m\033[?25h\n"))
 
     def test_applies_positive_audio_offset_in_ffplay_filter(self):
         with tempfile.NamedTemporaryFile() as file, patch(

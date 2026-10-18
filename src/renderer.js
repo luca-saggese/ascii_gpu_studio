@@ -158,7 +158,7 @@ void main(){
   value=mix(value,1.-value,invertValue);
 
   float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
-  vec3 ink=rgbMode>.5 ? avg : bwMode>.5 ? foreground : vec3(value);
+  vec3 ink=rgbMode>.5 ? avg : bwMode>.5 ? foreground : mix(background,foreground,value);
   if(captureMode>.5){
     color=captureMode<1.5 ? vec4(glyphIndex/max(glyphCount-1.,1.),0.,0.,1.) : vec4(ink,1.);
     return;
@@ -593,9 +593,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     textCanvas.width = sampleWidth;
     textCanvas.height = sampleHeight;
     const context = textCanvas.getContext('2d', { willReadFrequently: true });
-    const scale = Math.min(sampleWidth / width, sampleHeight / height);
-    const drawWidth = width * scale;
-    const drawHeight = height * scale;
+    const scale = Math.min(grid.outputWidth / width, grid.outputHeight / height);
+    const drawWidth = ((width * scale) / grid.cellWidth) * sampleScale;
+    const drawHeight = ((height * scale) / grid.cellHeight) * sampleScale;
     context.drawImage(
       source,
       (sampleWidth - drawWidth) / 2,
@@ -617,6 +617,9 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     const glyphs = atlas.chars;
     let text = '';
     const cellColors = currentScene.appearance.mode !== 'bw' ? [] : null;
+    const appearanceColors = getAppearanceColors(currentScene.appearance);
+    const background = color(appearanceColors.background);
+    const foreground = color(appearanceColors.foreground);
     for (let y = 0; y < grid.rows; y += 1) {
       for (let x = 0; x < grid.columns; x += 1) {
         const sampleX = x * sampleScale + Math.floor(sampleScale / 2);
@@ -652,8 +655,13 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         if (currentScene.appearance.invert) luminance = 1 - luminance;
         if (cellColors) {
           if (currentScene.appearance.mode === 'mono') {
-            const gray = Math.round(luminance * 255);
-            cellColors.push(gray, gray, gray);
+            for (let channel = 0; channel < 3; channel += 1)
+              cellColors.push(
+                Math.round(
+                  (background[channel] + (foreground[channel] - background[channel]) * luminance) *
+                    255,
+                ),
+              );
           } else {
             cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
           }

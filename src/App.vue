@@ -911,7 +911,7 @@ function onKeydown(event) {
                 <input
                   id="foreground"
                   :value="appearanceColors.foreground"
-                  :disabled="scene.appearance.mode !== 'rgb'"
+                  :disabled="scene.appearance.mode === 'bw'"
                   type="color"
                   @input="scene.appearance.foreground = $event.target.value"
                 /><code>{{ appearanceColors.foreground.toUpperCase() }}</code>
@@ -923,7 +923,7 @@ function onKeydown(event) {
                 <input
                   id="background"
                   :value="appearanceColors.background"
-                  :disabled="scene.appearance.mode !== 'rgb'"
+                  :disabled="scene.appearance.mode === 'bw'"
                   type="color"
                   @input="scene.appearance.background = $event.target.value"
                 /><code>{{ appearanceColors.background.toUpperCase() }}</code>

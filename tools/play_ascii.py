@@ -189,13 +189,12 @@ def render_frame(document, frame_index, terminal_width, terminal_height, color=T
     rows = render["rows"]
     top = max(0, (terminal_height - rows) // 2)
     first_row = max(0, (rows - terminal_height) // 2)
-    background = parse_color(render.get("colors", {}).get("background", "#000000"))
     mode = render.get("colors", {}).get("mode", "mono")
     foreground = parse_color(render.get("colors", {}).get("foreground", "#ffffff"))
     cell_colors = frame.get("_cell_colors")
     output = []
     if color:
-        output.append(f"\033[48;2;{background[0]};{background[1]};{background[2]}m")
+        output.append(ANSI_RESET + "\033[40m")
     output.append("\033[2J\033[H")
     output.extend("\n" for _ in range(top))
 
@@ -217,7 +216,6 @@ def render_frame(document, frame_index, terminal_width, terminal_height, color=T
             elif color:
                 output.append(f"\033[38;2;{foreground[0]};{foreground[1]};{foreground[2]}m")
             output.append(glyph)
-        output.append(ANSI_RESET if color else "")
         if terminal_row < min(rows, terminal_height) - 1:
             output.append("\n")
     output.append(ANSI_RESET)

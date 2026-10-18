@@ -59,6 +59,8 @@ python3 tools/play_ascii.py video.ascii --no-audio --no-color
 
 Audio is optional in `.ascii` documents. Silent exports play normally; when audio is present, FFplay handles the track while the terminal player schedules the ASCII frames. Startup and device latency from the external audio player may cause a small initial sync offset.
 
+With ANSI colors enabled, the player forces a black background for the full frame, including centered margins, regardless of the terminal theme or recorded background. Glyph colors are preserved. Default terminal colors are restored after rendering and on exit/Ctrl+C; the terminal theme is not changed. `--no-color` (or redirected output) does not force a background. This requires an ANSI-compatible terminal that honors background colors when clearing the screen.
+
 ## Portable `.ascii` projects and HTML playback
 
 `.ascii` files are gzip-compressed JSON containing the finished ASCII frames, timing, grid and visual settings—not the original image or video. Video documents may also include captured audio. Open them in ASCII GPU Studio, use the Python terminal player, or export a **standalone playable HTML** page for offline browser playback. The HTML player embeds its renderer and project data, supports video audio when present, and makes no CDN, font, or network requests.
