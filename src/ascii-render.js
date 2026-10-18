@@ -31,7 +31,7 @@ export function renderAsciiPage(context, page, render) {
         : (cellHeight + font.ascent - font.descent) / 2);
     for (let x = 0; x < columns; x += 1) {
       const glyph = line[x] || ' ';
-      if (mode === 'rgb' && colors) {
+      if ((mode === 'rgb' || mode === 'mono') && colors) {
         const index = (y * columns + x) * 3;
         context.fillStyle = `rgb(${colors[index]} ${colors[index + 1]} ${colors[index + 2]})`;
       } else {

@@ -114,7 +114,8 @@ export function validateScene(scene) {
 }
 
 export function getAppearanceColors(appearance) {
-  if (appearance.mode === 'bw') return { foreground: '#ffffff', background: '#000000' };
+  if (appearance.mode === 'bw' || appearance.mode === 'mono')
+    return { foreground: '#ffffff', background: '#000000' };
   return { foreground: appearance.foreground, background: appearance.background };
 }
 

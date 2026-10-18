@@ -4,6 +4,8 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 
 ## Completed
 
+- [x] Correct Monochrome to use one solid neutral-gray tone per glyph on black (not binary B/W or an intra-glyph gradient), shared by WebGL, CPU/vector, selectable text and stored/exported cell colors; retain legacy mono foregrounds without cell colors. Verified with lint, 26 JS unit tests, 7 terminal tests, build, 9 focused Chromium and 3 focused WebKit checks.
+- [x] Fix ASCII/HTML source-audio extraction without `captureStream` or MediaRecorder: locally remux original compressed audio into audio-only WebM/MP4 without re-encoding or real-time playback. Unit tests verify unchanged packets/timestamps, delayed starts, silent files, errors and cancellation; focused Chromium/WebKit checks verify exported audio playback with capture/codec APIs disabled.
 - [x] Add an accessible GitHub repository icon/link to the main header, visible on desktop and mobile; verified with a focused Chromium keyboard/link/layout test.
 - [x] AGPU-001 [P0] Bootstrap Vue/Vite JavaScript project — M0; `9c9633c`.
 - [x] AGPU-010 [P0] Import local images and render glyph atlas with WebGL2 — M1; E2E verifies complete, distinct glyph masks; `9c9633c`, `e835d84`.

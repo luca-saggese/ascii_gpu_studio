@@ -1,5 +1,6 @@
 import { getAppearanceColors } from './core.js';
 import { serializeAsciiDocument } from './ascii-document.js';
+import { extractSourceAudio } from './audio-export.js';
 
 const FRAME_INTERVAL_MS = 100;
 const MAX_EXPORT_FRAMES = 18000;
@@ -41,92 +42,6 @@ function waitForSeek(video, time, signal) {
     signal?.addEventListener('abort', onAbort, { once: true });
     video.currentTime = time;
   });
-}
-
-async function captureAudio(video, signal, onProgress) {
-  if (typeof video.captureStream !== 'function')
-    throw new Error('Questo browser non consente di estrarre l’audio dal video per il file ASCII.');
-  const stream = video.captureStream();
-  const tracks = stream.getAudioTracks();
-  if (!tracks.length) {
-    stream.getTracks().forEach((track) => track.stop());
-    return null;
-  }
-  if (typeof MediaRecorder === 'undefined') {
-    stream.getTracks().forEach((track) => track.stop());
-    throw new Error('MediaRecorder non disponibile: non posso incorporare l’audio nel file ASCII.');
-  }
-  const mimeType = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4;codecs=mp4a.40.2',
-    'audio/mp4',
-  ].find((type) => MediaRecorder.isTypeSupported(type));
-  if (!mimeType) {
-    stream.getTracks().forEach((track) => track.stop());
-    throw new Error('Il browser non dispone di un encoder audio WebM compatibile.');
-  }
-  const audioStream = new MediaStream(tracks);
-  const recorder = new MediaRecorder(audioStream, { mimeType });
-  const chunks = [];
-  const previous = {
-    time: video.currentTime,
-    loop: video.loop,
-    muted: video.muted,
-    volume: video.volume,
-  };
-  let abortHandler;
-  try {
-    await waitForSeek(video, 0, signal);
-    video.loop = false;
-    recorder.ondataavailable = (event) => {
-      if (event.data.size) chunks.push(event.data);
-    };
-    const completed = new Promise((resolve, reject) => {
-      recorder.onerror = () => reject(new Error('Registrazione della traccia audio non riuscita.'));
-      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType || mimeType }));
-      abortHandler = () => {
-        video.pause();
-        if (recorder.state !== 'inactive') recorder.stop();
-        reject(new DOMException('Esportazione annullata.', 'AbortError'));
-      };
-      signal?.addEventListener('abort', abortHandler, { once: true });
-      recorder.start(250);
-      video.addEventListener(
-        'ended',
-        () => {
-          if (recorder.state !== 'inactive') recorder.stop();
-        },
-        { once: true },
-      );
-      video.addEventListener(
-        'timeupdate',
-        () =>
-          onProgress(Math.min(0.4, (video.currentTime / Math.max(video.duration, 0.001)) * 0.4)),
-        { signal },
-      );
-    });
-    await video.play();
-    const audio = await completed;
-    if (!audio.size)
-      throw new Error('Il video contiene una traccia audio ma non è stato possibile acquisirla.');
-    return {
-      mimeType: audio.type || mimeType,
-      offsetMs: 0,
-      dataBase64: await blobToBase64(audio),
-    };
-  } finally {
-    signal?.removeEventListener('abort', abortHandler);
-    video.pause();
-    video.loop = previous.loop;
-    video.muted = previous.muted;
-    video.volume = previous.volume;
-    await waitForSeek(video, Math.min(previous.time, Math.max(0, video.duration - 0.001))).catch(
-      () => {},
-    );
-    stream.getTracks().forEach((track) => track.stop());
-    audioStream.getTracks().forEach((track) => track.stop());
-  }
 }
 
 function encodeCellColors(colors) {
@@ -229,6 +144,7 @@ export async function captureAsciiDocument({
   scene,
   kind,
   video = null,
+  sourceFile = null,
   signal,
   onProgress = () => {},
   onWarning = () => {},
@@ -258,7 +174,17 @@ export async function captureAsciiDocument({
     let audio = null;
     if (includeAudio) {
       try {
-        audio = await captureAudio(video, signal, onProgress);
+        const extracted = await extractSourceAudio(sourceFile, {
+          signal,
+          duration: video.duration,
+          onProgress: (progress) => onProgress(progress * 0.4),
+        });
+        if (extracted)
+          audio = {
+            mimeType: extracted.type,
+            offsetMs: 0,
+            dataBase64: await blobToBase64(extracted),
+          };
       } catch (error) {
         if (error.name === 'AbortError') throw error;
         onWarning(`Audio non incluso: ${error.message} L’esportazione ASCII prosegue senza audio.`);

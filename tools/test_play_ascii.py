@@ -74,6 +74,15 @@ class TerminalAsciiPlayerTests(unittest.TestCase):
         self.assertIn("\033[38;2;9;10;11mD", output)
         self.assertIn("\033[2J\033[H", output)
 
+    def test_monochrome_uses_one_gray_per_glyph(self):
+        document = sample_document()
+        document["render"]["colors"]["mode"] = "mono"
+        grays = bytes(channel for gray in range(32, 232, 25) for channel in [gray] * 3)
+        document["frames"][0]["_cell_colors"] = grays
+        output = render_frame(document, 0, 8, 4, color=True)
+        self.assertIn("\033[38;2;32;32;32mA", output)
+        self.assertIn("\033[38;2;107;107;107mD", output)
+
     def test_applies_positive_audio_offset_in_ffplay_filter(self):
         with tempfile.NamedTemporaryFile() as file, patch(
             "play_ascii.subprocess.Popen"

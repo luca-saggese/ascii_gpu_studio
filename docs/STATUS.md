@@ -12,6 +12,8 @@ Typography and appearance controls now use font size 4–16 (default 8), line he
 
 ## Works now
 
+- Monochrome now assigns one solid grayscale ink to each glyph from adjusted cell luminance, on a black background; contour antialiasing is not a source-image gradient. WebGL, Canvas fallback, vector, selectable text, stored `.ascii` colors and shared PNG/MP4/HTML rendering use these tones. Legacy mono documents without cell colors retain their foreground/background. Binary B/W and source RGB remain distinct. Lint, 26 JS unit tests, 7 terminal tests, build, 9 focused Chromium and 3 focused WebKit checks pass.
+- ASCII/HTML audio extraction reads the original local file with Mediabunny and copies compressed audio packets into an audio-only WebM or MP4, without `captureStream`, MediaRecorder, WebCodecs, real-time playback, or re-encoding. Original timestamps and source mute/volume state are preserved. Verified with lint, 22 unit tests, build, four focused Chromium video/export tests (including AAC), and two focused WebKit audio/silent-export tests. WebKit automation is not a complete Safari/device matrix or an acoustic audio-output assertion.
 - The main header includes an accessible GitHub icon linking to the repository in a new tab, visible on desktop and mobile. Lint, 16 unit tests, production build, formatting, and a focused Chromium keyboard/link/layout check (320-1440 px) pass.
 - Responsive Vue 3/Vite Studio with empty state, local image/video import, error handling, and no media upload.
 - Real WebGL2 fragment shader with measured glyph atlas, adjustable font size, line height, charset/color/brightness/contrast/invert controls, and PNG capture.
@@ -25,7 +27,7 @@ Typography and appearance controls now use font size 4–16 (default 8), line he
 - Save defaults persists the validated full Studio scene in localStorage; startup and Reset settings restore the saved values, with storage/validation errors surfaced in the UI.
 - Settings live in a fixed-height inspector with its own scroll region. Source, Typography, Appearance, Edge Detection, and Flatten Colors groups are collapsible; Edge Detection mode uses a select with Solo bordi and Bordi + immagine options.
 - Native HTML video audio and media clock, `requestVideoFrameCallback` rendering/fallback, user-triggered play/pause/seek/loop/mute/volume.
-- New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM audio, and compact per-cell RGB. Legacy ZIP projects remain importable.
+- New `.ascii` v1 gzip-JSON result export/import; stores text pages, render/font/color parameters, timestamps/durations, optional WebM/MP4 audio, and compact per-cell RGB. Legacy ZIP projects remain importable.
 - Video export no longer applies a cumulative 20-million-cell ceiling. The existing 30-minute duration cap and browser memory/`.ascii` size constraints still apply.
 - If audio capture is unavailable or fails, video ASCII frame export continues without audio and notifies the user; cancellation still aborts the export.
 - CPU export filtering avoids repeated Sobel neighborhood calculations and per-neighbor allocation in bilateral smoothing; unit tests compare optimized edge output to the reference magnitude.
@@ -41,9 +43,10 @@ Typography and appearance controls now use font size 4–16 (default 8), line he
 
 ## Does not work / not claimed
 
+- The full Chromium suite is not claimed green: the Source color image round-trip test reports bitmap PNG/offline HTML pixel mismatch (the offline bitmap HTML has no bundled font), and the broad run was stopped during the expensive global-video-palette assertion loop. Focused grayscale/vector/offline and B/W checks pass; bitmap offline typography remains dependent on installed fonts.
 - Temporal hysteresis, custom charset text entry, editing/history/undo, presets, custom font uploads, TXT/SVG export.
-- Safari has not yet been included in the automated browser matrix. MP4 output requires native WebCodecs H.264 encoding and, for audio, AAC encoding; unsupported device/browser configurations return a specific error.
-- `.ascii` audio capture still uses WebM/Opus via `captureStream` and MediaRecorder, so browser support varies and unsupported paths are reported while frame export continues silently. MP4 from a source video bypasses MediaRecorder and demuxes the original file; imported `.ascii` MP4 uses its embedded audio.
+- Two focused WebKit checks cover source-audio extraction/playback and silent ASCII export; the full Safari/device/browser matrix is still incomplete. MP4 output requires native WebCodecs H.264 encoding and, for audio, AAC encoding; unsupported device/browser configurations return a specific error.
+- `.ascii` audio extraction requires a container/codec recognized by Mediabunny that can be remuxed into WebM or MP4. Playback still requires browser support for that original codec. Extraction failures are explicitly reported while frame export continues without audio. MP4 from a source video demuxes the original file; imported `.ascii` MP4 uses its embedded audio.
 - React/Web Component packages, external Vue consumer install/publish, WebGL context restoration.
 - CI/browser matrix, screen-reader audit, quantitative performance/memory benchmarks, and hand-reviewed screenshots on other operating systems.
 - `.ascii` hard limits prevent oversized extraction, but the implementation still holds extracted file bytes in memory; archives are local, not streamed from remote storage.
@@ -52,7 +55,7 @@ Typography and appearance controls now use font size 4–16 (default 8), line he
 ## Known limits
 
 - Canvas 2D fallback preserves the preview when WebGL2 is unavailable, but CPU conversion can be slower, especially for video and high column counts. WebGL2 remains recommended for performance.
-- Video ASCII export captures optional audio in real time before deterministic 100 ms frame conversion; long clips can therefore remain time-consuming even after the CPU filter optimizations.
+- Video ASCII export remuxes audio before deterministic 100 ms frame conversion; long clips can still take time and memory for frame seeking/conversion, but no longer require real-time audio recording.
 - Browser codec support/autoplay policy governs video. Source file cap 100 MiB; legacy ZIP imports cap 110 MiB compressed, 200 MiB expanded, 32 entries. New `.ascii` gzip JSON export is not source-size bounded after compression.
 - The terminal player uses a monotonic wall clock with the external FFplay process; audio device/startup latency can cause a small initial sync offset. Without FFplay, use `--no-audio`.
 - `@ascii-gpu/vue` is currently a local workspace source package, not yet a standalone publishable package.

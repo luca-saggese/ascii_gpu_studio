@@ -2,6 +2,39 @@ import { test, expect } from '@playwright/test';
 import { gunzipSync, strFromU8, strToU8, zipSync } from 'fflate';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
+
+async function audioPlaybackTime(page, audio) {
+  return page.evaluate(async (audio) => {
+    const bytes = Uint8Array.from(atob(audio.dataBase64), (value) => value.charCodeAt(0));
+    const element = document.createElement('audio');
+    const url = URL.createObjectURL(new Blob([bytes], { type: audio.mimeType }));
+    element.src = url;
+    document.body.append(element);
+    let timer;
+    try {
+      await element.play();
+      await new Promise((resolve, reject) => {
+        element.ontimeupdate = () => {
+          if (element.currentTime > 0.05) resolve();
+        };
+        timer = setTimeout(
+          () => reject(new Error('Exported audio playback did not advance.')),
+          5000,
+        );
+      });
+      return element.currentTime;
+    } finally {
+      clearTimeout(timer);
+      element.ontimeupdate = null;
+      element.pause();
+      element.removeAttribute('src');
+      element.load();
+      element.remove();
+      URL.revokeObjectURL(url);
+    }
+  }, audio);
+}
 
 test('shows an accessible GitHub repository link on desktop and mobile', async ({ page }) => {
   await page.goto('/');
@@ -42,6 +75,128 @@ test('renders a polished empty state and adapts to mobile width', async ({ page 
     );
   }
 });
+
+for (const fallback of [false, true]) {
+  test(`uses one grayscale tone per monochrome glyph in ${fallback ? 'Canvas fallback' : 'WebGL'} and exports`, async ({
+    page,
+  }, testInfo) => {
+    if (fallback)
+      await page.addInitScript(() => {
+        const getContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (kind, ...args) {
+          return kind === 'webgl2' ? null : getContext.call(this, kind, ...args);
+        };
+      });
+    await page.goto('/');
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 96;
+      const context = canvas.getContext('2d');
+      for (let band = 0; band < 4; band += 1) {
+        context.fillStyle = `rgb(${32 + band * 56} ${16 + band * 48} ${64 + band * 32})`;
+        context.fillRect(band * 40, 0, 40, 96);
+      }
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'grayscale-bands.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(png, 'base64'),
+    });
+    await page.getByRole('button', { name: 'Monochrome', exact: true }).click();
+    await expect(page.getByLabel('Ink color')).toBeDisabled();
+    const bitmap = page.getByLabel('ASCII rendering preview', { exact: true });
+    const pixels = await bitmap.evaluate((canvas, fallback) => {
+      let data;
+      if (fallback)
+        data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      else {
+        const gl = canvas.getContext('webgl2');
+        data = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      }
+      const shades = new Set();
+      let gray = true;
+      for (let index = 0; index < data.length; index += 4) {
+        if (data[index] !== data[index + 1] || data[index] !== data[index + 2]) gray = false;
+        if (data[index] > 0) shades.add(data[index]);
+      }
+      return { gray, shades: shades.size, max: Math.max(...shades) };
+    }, fallback);
+    expect(pixels.gray).toBe(true);
+    expect(pixels.shades).toBeGreaterThan(3);
+    expect(pixels.max).toBeLessThan(220);
+
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/ }).click();
+    await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+    const asciiBytes = await readFile(await (await download).path());
+    const model = JSON.parse(strFromU8(gunzipSync(asciiBytes)));
+    expect(model.render.colors).toEqual({
+      mode: 'mono',
+      foreground: '#ffffff',
+      background: '#000000',
+    });
+    const colors = Buffer.from(model.frames[0].colors, 'base64');
+    expect(colors.length).toBe(model.render.columns * model.render.rows * 3);
+    const cellShades = new Set();
+    for (let index = 0; index < colors.length; index += 3) {
+      expect(colors[index]).toBe(colors[index + 1]);
+      expect(colors[index]).toBe(colors[index + 2]);
+      cellShades.add(colors[index]);
+    }
+    expect(cellShades.size).toBeGreaterThanOrEqual(4);
+    await page.getByRole('button', { name: 'ASCII text' }).click();
+    const textPreview = page.getByLabel('Plain text ASCII preview');
+    expect(await textPreview.textContent()).toBe(model.frames[0].text);
+    const textColors = await textPreview
+      .locator('span')
+      .evaluateAll((spans) => [...new Set(spans.map((span) => getComputedStyle(span).color))]);
+    expect(textColors.length).toBeGreaterThanOrEqual(4);
+    for (const color of textColors) {
+      const [red, green, blue] = color.match(/\d+/g).map(Number);
+      expect(red).toBe(green);
+      expect(red).toBe(blue);
+      expect(cellShades.has(red)).toBe(true);
+    }
+    await page.getByRole('button', { name: 'GPU', exact: true }).click();
+    await page.getByLabel('Rendering vettoriale').check();
+    const vector = page.getByLabel('ASCII vector rendering preview');
+    await expect(vector).toHaveAttribute('data-columns', String(model.render.columns));
+    const vectorIsGray = await vector.evaluate((canvas) => {
+      const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      return data.every(
+        (value, index) => index % 4 >= 2 || value === data[index - (index % 4) + 2],
+      );
+    });
+    expect(vectorIsGray).toBe(true);
+
+    const pngDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/ }).click();
+    await page.getByRole('menuitem', { name: 'Export PNG' }).click();
+    const pngBytes = await readFile(await (await pngDownload).path());
+    const htmlDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Export/ }).click();
+    await page.getByRole('menuitem', { name: 'Export HTML playable' }).click();
+    const htmlPath = testInfo.outputPath('monochrome.html');
+    await writeFile(htmlPath, await readFile(await (await htmlDownload).path()));
+    const offline = await page.context().newPage();
+    await offline.goto(pathToFileURL(htmlPath).href);
+    await expect(offline.locator('canvas')).toHaveJSProperty('width', model.render.width);
+    expect(await offline.locator('canvas').evaluate((canvas) => canvas.toDataURL())).toBe(
+      `data:image/png;base64,${pngBytes.toString('base64')}`,
+    );
+    await offline.close();
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'gray-roundtrip.ascii',
+      mimeType: 'application/gzip',
+      buffer: asciiBytes,
+    });
+    await expect(textPreview).toHaveText(model.frames[0].text);
+    expect(await textPreview.locator('span').count()).toBeGreaterThan(3);
+  });
+}
 
 test('renders true black and white without coloring glyphs', async ({ page }) => {
   await page.goto('/');
@@ -691,6 +846,7 @@ test('maps dark image cells to denser glyphs than bright image cells', async ({ 
     mimeType: 'image/png',
     buffer: Buffer.from(png, 'base64'),
   });
+  await page.getByRole('button', { name: 'Black and white' }).click();
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
   await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
   const coverage = await canvas.evaluate((element) => {
@@ -848,24 +1004,40 @@ test('keeps one globally sampled palette across video frames', async ({ page }) 
   }
 });
 
-test('exports video frames without audio when browser capture is unavailable', async ({ page }) => {
+test('preserves playable source audio without captureStream, MediaRecorder or WebCodecs', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
-    Object.defineProperty(HTMLMediaElement.prototype, 'captureStream', {
-      configurable: true,
-      value: undefined,
-    });
+    for (const name of ['captureStream', 'mozCaptureStream'])
+      Object.defineProperty(HTMLMediaElement.prototype, name, {
+        configurable: true,
+        value: undefined,
+      });
+    for (const name of ['MediaRecorder', 'AudioEncoder', 'AudioDecoder'])
+      Object.defineProperty(window, name, { configurable: true, value: undefined });
   });
   await page.goto('/');
   await page.locator('input[type=file]').setInputFiles('tests/fixtures/motion-with-audio.webm');
-  await expect(page.locator('video.media-source')).toHaveJSProperty('videoWidth', 320);
+  const source = page.locator('video.media-source');
+  await expect(source).toHaveJSProperty('videoWidth', 320);
+  await page.getByLabel('Video position').fill('0.7');
+  await source.evaluate((video) => {
+    video.muted = true;
+    video.volume = 0;
+  });
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: /Export/ }).click();
   await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
   const file = await download;
   const exported = JSON.parse(strFromU8(gunzipSync(await readFile(await file.path()))));
   expect(exported.contentType).toBe('video');
-  expect(exported).not.toHaveProperty('audio');
-  await expect(page.locator('.toast')).toContainText('L’esportazione ASCII prosegue senza audio');
+  expect(exported.audio.mimeType).toBe('audio/webm');
+  expect(await audioPlaybackTime(page, exported.audio)).toBeGreaterThan(0.05);
+  expect(await source.evaluate((video) => video.currentTime)).toBeCloseTo(0.7, 2);
+  await expect(source).toHaveJSProperty('muted', true);
+  await expect(source).toHaveJSProperty('volume', 0);
+  await expect(source).toHaveJSProperty('paused', true);
+  await expect(page.locator('.toast')).not.toContainText('Audio non incluso');
 });
 
 test('exports a playable MP4 for video without an audio track', async ({ page }) => {
@@ -1012,6 +1184,33 @@ test('plays, pauses, seeks, and loops a local video with its source audio track'
   expect(Math.abs(mp4Metadata.duration - sourceDurationMs / 1000)).toBeLessThan(0.1);
   expect(mp4Metadata.width).toBe(asciiDocument.render.width + (asciiDocument.render.width % 2));
   expect(mp4Metadata.height).toBe(asciiDocument.render.height + (asciiDocument.render.height % 2));
+
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'ascii-source-with-aac.mp4',
+    mimeType: 'video/mp4',
+    buffer: mp4Bytes,
+  });
+  await expect(video).toHaveJSProperty('videoWidth', mp4Metadata.width);
+  const aacDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: 'Export ASCII' }).click();
+  const aacDocument = JSON.parse(
+    strFromU8(gunzipSync(await readFile(await (await aacDownload).path()))),
+  );
+  expect(aacDocument.audio.mimeType).toBe('audio/mp4');
+  const aacInput = new Input({
+    formats: ALL_FORMATS,
+    source: new BlobSource(
+      new Blob([Buffer.from(aacDocument.audio.dataBase64, 'base64')], { type: 'audio/mp4' }),
+    ),
+  });
+  try {
+    expect(await (await aacInput.getPrimaryAudioTrack()).getCodec()).toBe('aac');
+    expect(await aacInput.getVideoTracks()).toHaveLength(0);
+  } finally {
+    aacInput.dispose();
+  }
+  expect(await audioPlaybackTime(page, aacDocument.audio)).toBeGreaterThan(0.05);
 
   await page.locator('input[type=file]').setInputFiles({
     name: asciiFile.suggestedFilename(),

@@ -209,7 +209,7 @@ def render_frame(document, frame_index, terminal_width, terminal_height, color=T
         for glyph, cell_x in cropped:
             if glyph == "":
                 continue
-            if color and cell_colors is not None and mode == "rgb" and cell_x is not None:
+            if color and cell_colors is not None and mode in ("rgb", "mono") and cell_x is not None:
                 cell_x = min(columns - 1, max(0, cell_x))
                 offset = (source_y * columns + cell_x) * 3
                 red, green, blue = cell_colors[offset : offset + 3]

@@ -158,8 +158,9 @@ void main(){
   value=mix(value,1.-value,invertValue);
 
   float glyphIndex=floor((1.-value)*(glyphCount-1.)+.5);
+  vec3 ink=rgbMode>.5 ? avg : bwMode>.5 ? foreground : vec3(value);
   if(captureMode>.5){
-    color=captureMode<1.5 ? vec4(glyphIndex/max(glyphCount-1.,1.),0.,0.,1.) : vec4(avg,1.);
+    color=captureMode<1.5 ? vec4(glyphIndex/max(glyphCount-1.,1.),0.,0.,1.) : vec4(ink,1.);
     return;
   }
   vec2 tilePixels=tileSize*atlasScale;
@@ -169,7 +170,6 @@ void main(){
   );
   float mask=texture(atlasTex,atlasUv).r;
   if(bwMode>.5) mask=step(.5,mask);
-  vec3 ink=rgbMode>.5 ? avg : foreground;
   color=vec4(mix(background,ink,mask),1.);
 }`;
 
@@ -616,14 +616,13 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
       : null;
     const glyphs = atlas.chars;
     let text = '';
-    const cellColors = currentScene.appearance.mode === 'rgb' ? [] : null;
+    const cellColors = currentScene.appearance.mode !== 'bw' ? [] : null;
     for (let y = 0; y < grid.rows; y += 1) {
       for (let x = 0; x < grid.columns; x += 1) {
         const sampleX = x * sampleScale + Math.floor(sampleScale / 2);
         const sampleY = y * sampleScale + Math.floor(sampleScale / 2);
         const offset = (sampleY * sampleWidth + sampleX) * 4;
         const alpha = pixels[offset + 3] / 255;
-        if (cellColors) cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
         let luminance;
         if (edges) {
           luminance = 1;
@@ -651,6 +650,14 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
         );
         luminance = Math.pow(luminance, 1 / Math.max(currentScene.appearance.gamma, 0.05));
         if (currentScene.appearance.invert) luminance = 1 - luminance;
+        if (cellColors) {
+          if (currentScene.appearance.mode === 'mono') {
+            const gray = Math.round(luminance * 255);
+            cellColors.push(gray, gray, gray);
+          } else {
+            cellColors.push(pixels[offset], pixels[offset + 1], pixels[offset + 2]);
+          }
+        }
         const density = 1 - luminance;
         const glyphIndex = Math.round(density * (glyphs.length - 1));
         text += alpha < 0.05 ? ' ' : glyphs[glyphIndex];

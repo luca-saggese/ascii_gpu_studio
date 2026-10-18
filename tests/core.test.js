@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { calculateContentLayout, DEFAULT_SCENE, validateScene } from '../src/core.js';
+import {
+  calculateContentLayout,
+  DEFAULT_SCENE,
+  getAppearanceColors,
+  validateScene,
+} from '../src/core.js';
 
 describe('scene and grid', () => {
+  it('uses neutral grayscale defaults without losing custom source-color settings', () => {
+    expect(getAppearanceColors(DEFAULT_SCENE.appearance)).toEqual({
+      foreground: '#ffffff',
+      background: '#000000',
+    });
+    expect(getAppearanceColors({ ...DEFAULT_SCENE.appearance, mode: 'rgb' })).toEqual({
+      foreground: DEFAULT_SCENE.appearance.foreground,
+      background: DEFAULT_SCENE.appearance.background,
+    });
+  });
   it('fits complete integer glyph cells inside the shared 1024 by 576 content bounds', () => {
     const cases = [
       [1920, 1080, 1024, 576],

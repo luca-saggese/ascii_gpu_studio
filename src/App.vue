@@ -154,6 +154,30 @@ const renderer = ref(null);
 const activeTab = ref('controls');
 const asciiMode = ref(false);
 const asciiText = ref('');
+const asciiCellColors = ref(null);
+const asciiTextRuns = computed(() => {
+  const frame = asciiDocument.value?.frames[0];
+  const mode = asciiDocument.value?.render.colors.mode ?? scene.value.appearance.mode;
+  const colors = frame?.colors
+    ? Uint8Array.from(atob(frame.colors), (character) => character.charCodeAt(0))
+    : asciiDocument.value
+      ? null
+      : asciiCellColors.value;
+  if (!colors || mode === 'bw') return [{ text: asciiText.value }];
+  const runs = [];
+  let index = 0;
+  for (const character of asciiText.value) {
+    if (character === '\n') {
+      runs.at(-1).text += character;
+      continue;
+    }
+    const offset = index++ * 3;
+    const color = `rgb(${colors[offset]} ${colors[offset + 1]} ${colors[offset + 2]})`;
+    if (runs.at(-1)?.color === color) runs.at(-1).text += character;
+    else runs.push({ text: character, color });
+  }
+  return runs;
+});
 let videoFrame = null;
 let observer = null;
 let lastTextFrameTime = 0;
@@ -355,6 +379,7 @@ function updateAsciiText(isVideoFrame = false) {
     if (result) {
       lastTextFrameTime = now;
       asciiText.value = result.text;
+      asciiCellColors.value = result.cellColors;
       statsLabel.value = {
         ...statsLabel.value,
         columns: result.columns,
@@ -487,6 +512,7 @@ async function buildExportDocument({
       scene: scene.value,
       kind: mediaKind.value,
       video: mediaKind.value === 'video' ? video.value : null,
+      sourceFile: mediaFile.value,
       signal,
       includeAudio,
       onProgress: (progress) => {
@@ -885,7 +911,7 @@ function onKeydown(event) {
                 <input
                   id="foreground"
                   :value="appearanceColors.foreground"
-                  :disabled="scene.appearance.mode === 'bw'"
+                  :disabled="scene.appearance.mode !== 'rgb'"
                   type="color"
                   @input="scene.appearance.foreground = $event.target.value"
                 /><code>{{ appearanceColors.foreground.toUpperCase() }}</code>
@@ -897,7 +923,7 @@ function onKeydown(event) {
                 <input
                   id="background"
                   :value="appearanceColors.background"
-                  :disabled="scene.appearance.mode === 'bw'"
+                  :disabled="scene.appearance.mode !== 'rgb'"
                   type="color"
                   @input="scene.appearance.background = $event.target.value"
                 /><code>{{ appearanceColors.background.toUpperCase() }}</code>
@@ -1104,7 +1130,9 @@ function onKeydown(event) {
             class="ascii-preview"
             :style="asciiPreviewStyle"
           >
-            <pre aria-label="Plain text ASCII preview">{{ asciiText }}</pre>
+            <pre
+              aria-label="Plain text ASCII preview"
+            ><span v-for="(run, index) in asciiTextRuns" :key="index" :style="{ color: run.color }">{{ run.text }}</span></pre>
             <div class="canvas-label"><i /> PLAIN TEXT · {{ statsLabel.columns }} COLUMNS</div>
           </div>
           <div class="stage-corner top-left" />
