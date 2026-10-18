@@ -4,8 +4,8 @@ export const DEFAULT_SCENE = Object.freeze({
   typography: {
     charset: ' .,:;irsXA253hMHGS#9B&@',
     fontFamily: 'IBM Plex Mono',
-    fontSize: 14,
-    lineHeight: 1.3,
+    fontSize: 8,
+    lineHeight: 1,
     fontWeight: 500,
   },
   rendering: { mode: 'bitmap' },
@@ -14,14 +14,14 @@ export const DEFAULT_SCENE = Object.freeze({
     foreground: '#d5f5e9',
     background: '#101715',
     brightness: 0,
-    contrast: 1,
+    contrast: 0.4,
     gamma: 1,
     invert: false,
     fit: 'contain',
   },
   edgeDetection: {
     enabled: false,
-    threshold: 56,
+    threshold: 1,
     smoothing: 0,
     mode: 'edges',
     intensity: 0.65,
@@ -35,7 +35,7 @@ export function validateScene(scene) {
   const charset = scene?.typography?.charset;
   const maxCells = Number(scene?.grid?.maxCells);
   const fontSize = Number(scene?.typography?.fontSize);
-  const lineHeight = Number(scene?.typography?.lineHeight ?? 1.3);
+  const lineHeight = Number(scene?.typography?.lineHeight ?? 1);
   const brightness = Number(scene?.appearance?.brightness);
   const contrast = Number(scene?.appearance?.contrast);
   const gamma = Number(scene?.appearance?.gamma);
@@ -53,14 +53,14 @@ export function validateScene(scene) {
   ) {
     throw new Error('Il charset deve contenere da 2 a 128 glifi.');
   }
-  if (!Number.isFinite(fontSize) || fontSize < 4 || fontSize > 96)
-    throw new Error('La dimensione del font deve essere compresa tra 4 e 96 px.');
-  if (!Number.isFinite(lineHeight) || lineHeight < 1 || lineHeight > 2)
-    throw new Error('L’interlinea deve essere compresa tra 1 e 2.');
+  if (!Number.isFinite(fontSize) || fontSize < 4 || fontSize > 16)
+    throw new Error('La dimensione del font deve essere compresa tra 4 e 16 px.');
+  if (!Number.isFinite(lineHeight) || lineHeight < 0.8 || lineHeight > 1.5)
+    throw new Error('L’interlinea deve essere compresa tra 0,8 e 1,5.');
   if (!Number.isFinite(brightness) || brightness < -1 || brightness > 1)
     throw new Error('La luminosità deve essere compresa tra -1 e 1.');
-  if (!Number.isFinite(contrast) || contrast < 0.2 || contrast > 3)
-    throw new Error('Il contrasto deve essere compreso tra 0,2 e 3.');
+  if (!Number.isFinite(contrast) || contrast < 0.4 || contrast > 1)
+    throw new Error('Il contrasto deve essere compreso tra 0,4 e 1.');
   if (!Number.isFinite(gamma) || gamma < 0.05 || gamma > 5)
     throw new Error('Il gamma deve essere compreso tra 0,05 e 5.');
   if (!['mono', 'rgb', 'bw'].includes(scene.appearance.mode))
@@ -85,7 +85,7 @@ export function validateScene(scene) {
     typeof edge?.enabled !== 'boolean' ||
     !Number.isInteger(edge.threshold) ||
     edge.threshold < 0 ||
-    edge.threshold > 255 ||
+    edge.threshold > 100 ||
     !Number.isInteger(edge.smoothing) ||
     edge.smoothing < 0 ||
     edge.smoothing > 3 ||

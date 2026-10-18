@@ -161,9 +161,20 @@ test('renders true black and white without coloring glyphs', async ({ page }) =>
 
 test('saves parameter defaults for reset and future sessions', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#font-size').fill('18');
-  await page.locator('#line-height').fill('1.5');
+  await expect(page.locator('#font-size')).toHaveAttribute('min', '4');
+  await expect(page.locator('#font-size')).toHaveAttribute('max', '16');
+  await expect(page.locator('#font-size')).toHaveValue('8');
+  await expect(page.locator('#line-height')).toHaveAttribute('min', '0.8');
+  await expect(page.locator('#line-height')).toHaveAttribute('max', '1.5');
+  await expect(page.locator('#line-height')).toHaveValue('1');
+  await expect(page.locator('#contrast')).toHaveAttribute('min', '0.4');
+  await expect(page.locator('#contrast')).toHaveAttribute('max', '1');
+  await expect(page.locator('#contrast')).toHaveValue('0.4');
   await page.getByLabel('Enable edge detection').check();
+  await expect(page.locator('#edge-threshold')).toHaveAttribute('max', '100');
+  await expect(page.locator('#edge-smoothing')).toHaveValue('0');
+  await page.locator('#font-size').fill('16');
+  await page.locator('#line-height').fill('1.5');
   await page.getByLabel('Threshold value').fill('91');
   await page.getByRole('button', { name: 'Save defaults' }).click();
   await expect(page.getByText('Parametri predefiniti salvati')).toBeVisible();
@@ -171,12 +182,12 @@ test('saves parameter defaults for reset and future sessions', async ({ page }) 
   await page.locator('#line-height').fill('1.1');
   await page.getByLabel('Enable edge detection').uncheck();
   await page.locator('.panel-heading-actions .icon-button').click();
-  await expect(page.locator('#font-size')).toHaveValue('18');
+  await expect(page.locator('#font-size')).toHaveValue('16');
   await expect(page.locator('#line-height')).toHaveValue('1.5');
   await expect(page.getByLabel('Enable edge detection')).toBeChecked();
   await expect(page.getByLabel('Threshold value')).toHaveValue('91');
   await page.reload();
-  await expect(page.locator('#font-size')).toHaveValue('18');
+  await expect(page.locator('#font-size')).toHaveValue('16');
   await expect(page.locator('#line-height')).toHaveValue('1.5');
   await expect(page.getByLabel('Enable edge detection')).toBeChecked();
   await expect(page.getByLabel('Threshold value')).toHaveValue('91');
@@ -237,7 +248,7 @@ test('imports an image, renders through WebGL2, and exports the source project',
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
   await expect(canvas).toHaveAttribute('data-columns', /[1-9]\d*/);
   await expect(canvas).toHaveAttribute('data-rows', /[1-9]/);
-  await expect(page.locator('#font-size')).toHaveAttribute('max', '48');
+  await expect(page.locator('#font-size')).toHaveAttribute('max', '16');
   await expect(page.getByText('Character size')).toHaveCount(0);
   await expect
     .poll(() => canvas.getAttribute('data-atlas-scale').then(Number))
@@ -316,7 +327,7 @@ test('imports an image, renders through WebGL2, and exports the source project',
     width: element.dataset.outputWidth,
     height: element.dataset.outputHeight,
   }));
-  await page.locator('#font-size').fill('18');
+  await page.locator('#font-size').fill('12');
   await expect
     .poll(() => canvas.getAttribute('data-output-width'))
     .not.toBe(originalDimensions.width);
@@ -712,7 +723,7 @@ test('applies Sobel edge detection live and stores its settings with converted p
   const canvas = page.locator('canvas[aria-label="ASCII rendering preview"]');
   const original = await canvas.evaluate((element) => element.toDataURL());
   await page.getByLabel('Enable edge detection').check();
-  await expect(page.getByLabel('Threshold value')).toHaveValue('56');
+  await expect(page.getByLabel('Threshold value')).toHaveValue('1');
   await page.getByLabel('Threshold value').fill('12');
   await expect.poll(() => canvas.evaluate((element) => element.toDataURL())).not.toBe(original);
   await page.locator('#edge-mode').selectOption('image');

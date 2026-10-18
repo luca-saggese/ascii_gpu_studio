@@ -520,7 +520,7 @@ export function createAsciiRenderer({ canvas, scene, onError = () => {}, onStats
     currentScene.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
     currentScene.flattenColors ??= cloneScene(DEFAULT_SCENE.flattenColors);
     setUniforms('edgeEnabled', currentScene.edgeDetection.enabled ? 1 : 0);
-    setUniforms('edgeThreshold', currentScene.edgeDetection.threshold / 255);
+    setUniforms('edgeThreshold', currentScene.edgeDetection.threshold / 100);
     setUniforms('edgeSmoothing', currentScene.edgeDetection.smoothing);
     setUniforms('edgeMode', currentScene.edgeDetection.mode === 'edges' ? 0 : 1);
     setUniforms('edgeIntensity', currentScene.edgeDetection.intensity);

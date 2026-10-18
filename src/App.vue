@@ -89,11 +89,22 @@ function readSavedDefaults() {
   const saved = window.localStorage.getItem(DEFAULTS_STORAGE_KEY);
   if (saved === null) return null;
   const parsed = JSON.parse(saved);
-  validateScene(parsed);
   parsed.rendering ??= cloneScene(DEFAULT_SCENE.rendering);
   parsed.typography.fontFamily = fontFamilyFor(parsed.typography.fontFamily);
-  parsed.typography.lineHeight ??= 1.3;
+  parsed.typography.fontSize = Math.min(16, Math.max(4, parsed.typography.fontSize ?? 8));
+  parsed.typography.lineHeight = Math.min(1.5, Math.max(0.8, parsed.typography.lineHeight ?? 1));
+  parsed.appearance.contrast = Math.min(1, Math.max(0.4, parsed.appearance.contrast ?? 0.4));
+  parsed.edgeDetection ??= cloneScene(DEFAULT_SCENE.edgeDetection);
+  parsed.edgeDetection.threshold = Math.min(
+    100,
+    Math.max(0, Math.round(parsed.edgeDetection.threshold ?? 1)),
+  );
+  parsed.edgeDetection.smoothing = Math.min(
+    3,
+    Math.max(0, Math.round(parsed.edgeDetection.smoothing ?? 0)),
+  );
   parsed.appearance.fit = 'contain';
+  validateScene(parsed);
   return cloneScene(parsed);
 }
 
@@ -810,11 +821,11 @@ function onKeydown(event) {
               id="font-size"
               v-model.number="scene.typography.fontSize"
               type="range"
-              min="8"
-              max="48"
+              min="4"
+              max="16"
               step="1"
             />
-            <div class="range-ends"><span>8 px</span><span>48 px</span></div>
+            <div class="range-ends"><span>4 px</span><span>16 px</span></div>
             <label class="field-label" for="line-height"
               >Line height <output>{{ scene.typography.lineHeight.toFixed(2) }}×</output></label
             >
@@ -822,8 +833,8 @@ function onKeydown(event) {
               id="line-height"
               v-model.number="scene.typography.lineHeight"
               type="range"
-              min="1"
-              max="2"
+              min="0.8"
+              max="1.5"
               step="0.05"
             />
           </details>
@@ -884,9 +895,9 @@ function onKeydown(event) {
               id="contrast"
               v-model.number="scene.appearance.contrast"
               type="range"
-              min="0.2"
-              max="2.5"
-              step="0.1"
+              min="0.4"
+              max="1"
+              step="0.05"
             />
             <label class="field-label" for="brightness"
               >Brightness
@@ -925,7 +936,7 @@ function onKeydown(event) {
                   v-model.number="scene.edgeDetection.threshold"
                   type="range"
                   min="0"
-                  max="255"
+                  max="100"
                   step="1"
                 />
                 <input
@@ -933,7 +944,7 @@ function onKeydown(event) {
                   aria-label="Threshold value"
                   type="number"
                   min="0"
-                  max="255"
+                  max="100"
                   step="1"
                 />
               </div>

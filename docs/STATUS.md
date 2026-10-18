@@ -6,9 +6,9 @@ Latest committed implementation: `240ddb2` (`fix(export): mux source video audio
 
 Additional checkpoints: `9c9633c` (Studio/runtime implementation), `c229bda` (video audio decode E2E), `06410a5` (archive path hardening)
 
-
 Latest verification for preview/export parity: `pnpm lint`, `pnpm test` (16 tests), `pnpm build`, and focused Chromium tests for B/W output and shared bitmap/vector/PNG/HTML dimensions pass. ASCII text reads the same glyph indices selected by the WebGL shader, remains selectable/copyable as text, and uses the shared cell/font metrics. Bitmap PNG export uses the loaded document fonts so it matches the text and WebGL glyphs. Safari is not included in the browser matrix.
 
+Typography and appearance controls now use font size 4–16 (default 8), line height 0.8–1.5 (default 1), and contrast 0.4–1 (default 0.4). Edge Detection threshold is 0–100 (default 1), and smoothing defaults to Off (0).
 
 ## Works now
 

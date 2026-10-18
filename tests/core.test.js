@@ -30,6 +30,31 @@ describe('scene and grid', () => {
 
   it('accepts defaults and rejects unsafe grid and charset values', () => {
     expect(validateScene(structuredClone(DEFAULT_SCENE))).toBe(true);
+    expect(DEFAULT_SCENE.typography.fontSize).toBe(8);
+    expect(DEFAULT_SCENE.typography.lineHeight).toBe(1);
+    expect(DEFAULT_SCENE.appearance.contrast).toBe(0.4);
+    expect(DEFAULT_SCENE.edgeDetection.threshold).toBe(1);
+    expect(DEFAULT_SCENE.edgeDetection.smoothing).toBe(0);
+    expect(
+      validateScene({
+        ...structuredClone(DEFAULT_SCENE),
+        typography: { ...DEFAULT_SCENE.typography, fontSize: 16, lineHeight: 0.8 },
+        appearance: { ...DEFAULT_SCENE.appearance, contrast: 1 },
+        edgeDetection: { ...DEFAULT_SCENE.edgeDetection, threshold: 100 },
+      }),
+    ).toBe(true);
+    expect(() =>
+      validateScene({
+        ...structuredClone(DEFAULT_SCENE),
+        typography: { ...DEFAULT_SCENE.typography, fontSize: 17 },
+      }),
+    ).toThrow(/4 e 16/);
+    expect(() =>
+      validateScene({
+        ...structuredClone(DEFAULT_SCENE),
+        appearance: { ...DEFAULT_SCENE.appearance, contrast: 0.3 },
+      }),
+    ).toThrow(/0,4 e 1/);
     expect(
       validateScene({
         ...structuredClone(DEFAULT_SCENE),

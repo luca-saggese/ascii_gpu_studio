@@ -41,7 +41,7 @@ export function edgeMagnitude(data, width, height, x, y, smoothing = 0) {
 
 export function createEdgeMap(data, width, height, options, basePixels = data) {
   const { threshold, smoothing, mode, intensity } = options;
-  const thresholdValue = threshold / 255;
+  const thresholdValue = threshold / 100;
   const luminance = new Float64Array(width * height);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {

@@ -19,9 +19,9 @@ function verticalStep(width, height) {
 describe('Sobel edge detection', () => {
   it('uses a fixed gradient scale so higher thresholds retain fewer edges', () => {
     const data = verticalStep(12, 8);
-    const options = { threshold: 16, smoothing: 0, mode: 'edges', intensity: 1 };
+    const options = { threshold: 6, smoothing: 0, mode: 'edges', intensity: 1 };
     const low = createEdgeMap(data, 12, 8, options);
-    const high = createEdgeMap(data, 12, 8, { ...options, threshold: 240 });
+    const high = createEdgeMap(data, 12, 8, { ...options, threshold: 94 });
     expect(Math.min(...low)).toBeLessThan(1);
     expect(Math.min(...high)).toBe(1);
   });

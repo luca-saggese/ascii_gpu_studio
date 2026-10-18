@@ -168,7 +168,7 @@ function createDocument({ kind, scene, firstPage, audio }) {
         JSON.stringify(
           scene.edgeDetection ?? {
             enabled: false,
-            threshold: 56,
+            threshold: 1,
             smoothing: 0,
             mode: 'edges',
             intensity: 0.65,

@@ -12,7 +12,7 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
   "filters": {
     "edgeDetection": {
       "enabled": false,
-      "threshold": 56,
+      "threshold": 1,
       "smoothing": 0,
       "mode": "edges",
       "intensity": 0.65
@@ -36,7 +36,7 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
     "target": { "width": 1024, "height": 576 },
     "font": {
       "family": "IBM Plex Mono",
-      "size": 16,
+      "size": 8,
       "weight": 500,
       "lineHeight": 1,
       "ascent": 12,
@@ -63,9 +63,7 @@ An `.ascii` file is a gzip-compressed UTF-8 JSON document. The JSON carries conv
 
 An image has exactly one page and no audio. Video pages are complete frames sampled at 100 ms intervals; each frame records its timestamp and display duration. In source-color mode, a page can also store `colors`: Base64-encoded RGB bytes, three bytes per cell in row-major order. This compact binary field is for cell colors only; frame text stays directly in JSON.
 
-
 Black-and-white rendering uses `render.colors.mode: "bw"` with white foreground and black background. Its pages omit per-cell RGB data; luminance still selects glyphs across the full charset, while rendered pixels are thresholded to black or white.
-
 
 Video audio is optional and stored as `{ mimeType, offsetMs, dataBase64 }`. For `.ascii` export, the browser records the source audio track in a supported audio-only container (normally WebM/Opus in Chromium or MP4/AAC in Safari) and embeds those bytes. `offsetMs` is relative to the ASCII frame timeline. HTML playback uses the audio clock when audio is present and a monotonic clock otherwise. MP4 export from a loaded source video demuxes audio directly from the original local file; MP4 export from an imported `.ascii` document decodes its embedded audio. Both paths encode the audio as AAC.
 

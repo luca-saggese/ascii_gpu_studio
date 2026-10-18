@@ -27,6 +27,7 @@ Each status reflects the tested user-facing path, not code presence alone. Estim
 - [x] AGPU-067 [P1] Add a Python terminal player for gzip-JSON `.ascii` video with centered cropping, timestamp-driven adaptive frame pacing, optional FPS cap, and embedded FFplay audio; cover decoding, crop, and RGB output with unit tests.
 - [x] AGPU-066 [P1] Unify source-aware logical dimensions and integer font-cell metrics across bitmap/vector preview, PNG, MP4, `.ascii`, and offline HTML; preserve contain behavior and verify horizontal, vertical, and square media.
 - [x] AGPU-068 [P1] Use WebGL-selected glyph indices for selectable ASCII text and bitmap PNG export; align the text preview to shared font-cell metrics and verify B/W and cross-renderer dimensions in Chromium.
+- [x] AGPU-069 [P1] Set requested font size, line height, contrast, and Edge Detection ranges/defaults; apply threshold percentage consistently in shader/CPU paths and normalize persisted settings.
 
 ## In progress
 
